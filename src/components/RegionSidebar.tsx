@@ -1,12 +1,16 @@
-import { useState } from "react";
-import { X, ExternalLink, Tag, XCircle, ShoppingCart } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, ExternalLink, Tag, XCircle, ShoppingCart, Image, Link, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
+import { BLOCK_SIZE } from "@/types/region";
 
 const RegionSidebar = () => {
-  const { selectedRegion, setSelectedRegion, listRegion, unlistRegion, buyListedRegion } = useRegions();
+  const { selectedRegion, setSelectedRegion, listRegion, unlistRegion, buyListedRegion, setRegionImage, setRegionLink } = useRegions();
   const [listPrice, setListPrice] = useState("");
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkValue, setLinkValue] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!selectedRegion) return null;
 
@@ -30,6 +34,41 @@ const RegionSidebar = () => {
     toast.success("Region purchased!");
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // Resize to fit region
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = r.width * BLOCK_SIZE;
+        canvas.height = r.height * BLOCK_SIZE;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const resized = canvas.toDataURL("image/png");
+        setRegionImage(r.id, resized);
+        toast.success("Image updated");
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleSaveLink = () => {
+    setRegionLink(r.id, linkValue);
+    setEditingLink(false);
+    toast.success("Link updated");
+  };
+
+  const startEditLink = () => {
+    setLinkValue(r.linkUrl || "");
+    setEditingLink(true);
+  };
+
   return (
     <div className="w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto">
       <div className="flex items-center justify-between p-4 border-b border-border">
@@ -39,7 +78,6 @@ const RegionSidebar = () => {
         </button>
       </div>
 
-      {/* Image preview */}
       {r.imageUrl && (
         <div className="p-4 border-b border-border">
           <img src={r.imageUrl} alt="Region" className="w-full rounded border border-border object-contain" />
@@ -73,15 +111,47 @@ const RegionSidebar = () => {
             {r.isListed ? `Listed @ ${r.listingPrice} SOL` : "Not listed"}
           </span>
         </div>
+        {r.linkUrl && (
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">URL</span>
+            <a href={r.linkUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs truncate max-w-[140px]">
+              {r.linkUrl}
+            </a>
+          </div>
+        )}
 
-        <a
-          href="#"
-          className="flex items-center gap-1 text-xs text-primary hover:underline"
-          onClick={(e) => e.preventDefault()}
-        >
+        <a href="#" className="flex items-center gap-1 text-xs text-primary hover:underline" onClick={(e) => e.preventDefault()}>
           <ExternalLink className="w-3 h-3" />
           View on Explorer
         </a>
+      </div>
+
+      {/* Owner actions: change image & URL */}
+      <div className="px-4 pb-2 space-y-2 border-t border-border pt-3">
+        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Owner Actions</p>
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => fileInputRef.current?.click()}>
+          <Image className="w-4 h-4" />
+          {r.imageUrl ? "Change Image" : "Upload Image"}
+        </Button>
+
+        {editingLink ? (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://..."
+              value={linkValue}
+              onChange={(e) => setLinkValue(e.target.value)}
+              className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <Button size="sm" variant="outline" onClick={handleSaveLink}>Save</Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="w-full gap-2" onClick={startEditLink}>
+            <Link className="w-4 h-4" />
+            {r.linkUrl ? "Edit URL" : "Add URL"}
+          </Button>
+        )}
       </div>
 
       <div className="p-4 border-t border-border space-y-2 mt-auto">

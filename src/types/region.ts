@@ -6,6 +6,7 @@ export interface Region {
   height: number;
   owner: string;
   imageUrl: string;
+  linkUrl: string;
   purchasePrice: number;
   isListed: boolean;
   listingPrice?: number;
