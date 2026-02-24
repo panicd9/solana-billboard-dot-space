@@ -11,6 +11,7 @@ interface RegionContextType {
   hasOverlap: (sel: Selection) => boolean;
   purchaseRegion: (sel: Selection) => Region;
   setRegionImage: (regionId: string, imageUrl: string) => void;
+  setRegionLink: (regionId: string, linkUrl: string) => void;
   listRegion: (regionId: string, price: number) => void;
   unlistRegion: (regionId: string) => void;
   buyListedRegion: (regionId: string, buyerAddress: string) => void;
@@ -76,6 +77,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         height: sel.height,
         owner: generateMockAddress(),
         imageUrl: "",
+        linkUrl: "",
         purchasePrice: totalBlocks * PRICE_PER_BLOCK,
         isListed: false,
         createdAt: Date.now(),
@@ -109,6 +111,10 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
     img.src = imageUrl;
   }, []);
 
+  const setRegionLink = useCallback((regionId: string, linkUrl: string) => {
+    setRegions((prev) => prev.map((r) => (r.id === regionId ? { ...r, linkUrl } : r)));
+  }, []);
+
   const listRegion = useCallback((regionId: string, price: number) => {
     setRegions((prev) => prev.map((r) => (r.id === regionId ? { ...r, isListed: true, listingPrice: price } : r)));
   }, []);
@@ -137,6 +143,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         hasOverlap,
         purchaseRegion,
         setRegionImage,
+        setRegionLink,
         listRegion,
         unlistRegion,
         buyListedRegion,
