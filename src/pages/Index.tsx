@@ -1,88 +1,69 @@
 import { useState, useCallback } from "react";
-import PixelCanvas, { type Selection } from "@/components/PixelCanvas";
+import { Selection } from "@/types/region";
+import { RegionProvider, useRegions } from "@/context/RegionContext";
+import PixelCanvas from "@/components/PixelCanvas";
 import CanvasToolbar from "@/components/CanvasToolbar";
-import { toast } from "sonner";
+import PurchasePanel from "@/components/PurchasePanel";
+import RegionSidebar from "@/components/RegionSidebar";
+import MarketplaceView from "@/components/MarketplaceView";
 
-const GRID_COLS = 192;
-const GRID_ROWS = 108;
-
-interface PlacedImage {
-  col: number;
-  row: number;
-  width: number;
-  height: number;
-  image: HTMLImageElement;
-}
-
-const Index = () => {
+const IndexInner = () => {
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [placedImages, setPlacedImages] = useState<PlacedImage[]>([]);
-  const [occupied, setOccupied] = useState<boolean[][]>(() =>
-    Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(false))
+  const [view, setView] = useState<"canvas" | "marketplace">("canvas");
+  const { regions, setSelectedRegion, selectedRegion } = useRegions();
+
+  const handleRegionClick = useCallback(
+    (regionId: string) => {
+      const region = regions.find((r) => r.id === regionId);
+      if (region) {
+        setSelectedRegion(region);
+        setSelection(null);
+      }
+    },
+    [regions, setSelectedRegion]
   );
 
-  const markOccupied = useCallback(
-    (sel: Selection) => {
-      setOccupied((prev) => {
-        const next = prev.map((row) => [...row]);
-        for (let r = sel.row; r < sel.row + sel.height; r++) {
-          for (let c = sel.col; c < sel.col + sel.width; c++) {
-            next[r][c] = true;
-          }
-        }
-        return next;
-      });
+  const handleMarketplaceHighlight = useCallback(
+    (regionId: string) => {
+      setView("canvas");
     },
     []
   );
 
-  const handleImageUpload = useCallback(
-    (file: File) => {
-      if (!selection) {
-        toast.error("Select an area first");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const placed: PlacedImage = {
-            col: selection.col,
-            row: selection.row,
-            width: selection.width,
-            height: selection.height,
-            image: img,
-          };
-          setPlacedImages((prev) => [...prev, placed]);
-          markOccupied(selection);
-          setSelection(null);
-          toast.success(
-            `Image placed at (${selection.col}, ${selection.row}) — ${selection.width}×${selection.height} blocks`
-          );
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    },
-    [selection, markOccupied]
-  );
-
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
-      <CanvasToolbar
-        selection={selection}
-        onClearSelection={() => setSelection(null)}
-        onImageUpload={handleImageUpload}
-      />
-      <PixelCanvas
-        selection={selection}
-        onSelectionChange={setSelection}
-        placedImages={placedImages}
-        occupied={occupied}
-      />
+      <CanvasToolbar view={view} onViewChange={setView} />
+      <div className="flex flex-1 overflow-hidden relative">
+        {view === "canvas" ? (
+          <>
+            <div className="flex-1 flex relative overflow-hidden">
+              <PixelCanvas
+                selection={selection}
+                onSelectionChange={setSelection}
+                onRegionClick={handleRegionClick}
+              />
+              <PurchasePanel
+                selection={selection}
+                onClearSelection={() => setSelection(null)}
+              />
+            </div>
+            {selectedRegion && <RegionSidebar />}
+          </>
+        ) : (
+          <>
+            <MarketplaceView onHighlightRegion={handleMarketplaceHighlight} />
+            {selectedRegion && <RegionSidebar />}
+          </>
+        )}
+      </div>
     </div>
   );
 };
+
+const Index = () => (
+  <RegionProvider>
+    <IndexInner />
+  </RegionProvider>
+);
 
 export default Index;
