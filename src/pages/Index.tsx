@@ -10,6 +10,8 @@ import MarketplaceView from "@/components/MarketplaceView";
 const IndexInner = () => {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [view, setView] = useState<"canvas" | "marketplace">("canvas");
+  const [purchasePanelOpen, setPurchasePanelOpen] = useState(false);
+  const [purchasePanelCollapsed, setPurchasePanelCollapsed] = useState(false);
   const { regions, setSelectedRegion, selectedRegion } = useRegions();
 
   const handleRegionClick = useCallback(
@@ -18,6 +20,7 @@ const IndexInner = () => {
       if (region) {
         setSelectedRegion(region);
         setSelection(null);
+        setPurchasePanelOpen(false);
       }
     },
     [regions, setSelectedRegion]
@@ -30,6 +33,24 @@ const IndexInner = () => {
     []
   );
 
+  const handleClearSelection = () => {
+    setSelection(null);
+    setPurchasePanelOpen(false);
+    setPurchasePanelCollapsed(false);
+  };
+
+  // When user starts or completes a selection, keep panel open
+  const handleSelectionChange = (sel: Selection | null) => {
+    setSelection(sel);
+    if (sel) {
+      setSelectedRegion(null);
+      setPurchasePanelOpen(true);
+      setPurchasePanelCollapsed(false);
+    }
+    // When sel is null (drag start), keep purchasePanelOpen as-is
+    // so the sidebar doesn't unmount and cause layout shift
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <CanvasToolbar view={view} onViewChange={setView} />
@@ -39,14 +60,18 @@ const IndexInner = () => {
             <div className="flex-1 flex relative overflow-hidden">
               <PixelCanvas
                 selection={selection}
-                onSelectionChange={setSelection}
+                onSelectionChange={handleSelectionChange}
                 onRegionClick={handleRegionClick}
               />
+            </div>
+            {purchasePanelOpen && !selectedRegion && (
               <PurchasePanel
                 selection={selection}
-                onClearSelection={() => setSelection(null)}
+                onClearSelection={handleClearSelection}
+                collapsed={purchasePanelCollapsed}
+                onToggleCollapse={() => setPurchasePanelCollapsed((c) => !c)}
               />
-            </div>
+            )}
             {selectedRegion && <RegionSidebar />}
           </>
         ) : (
