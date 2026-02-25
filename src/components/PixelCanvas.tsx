@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react";
 import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, Selection } from "@/types/region";
 import { useRegions } from "@/context/RegionContext";
+import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
 
 interface Props {
   selection: Selection | null;
@@ -8,8 +9,12 @@ interface Props {
   onRegionClick: (regionId: string) => void;
 }
 
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 5;
+
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
@@ -18,19 +23,29 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
   const [tooltipInfo, setTooltipInfo] = useState<{ x: number; y: number; text: string } | null>(null);
   const animRef = useRef<number>(0);
 
-  const getBlockCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Pan & Zoom state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  const screenToCanvas = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_W / rect.width;
-    const scaleY = CANVAS_H / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-    const col = Math.floor(x / BLOCK_SIZE);
-    const row = Math.floor(y / BLOCK_SIZE);
+    const x = (clientX - rect.left - pan.x) / zoom;
+    const y = (clientY - rect.top - pan.y) / zoom;
+    return { x, y };
+  }, [pan, zoom]);
+
+  const getBlockCoords = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const pos = screenToCanvas(e.clientX, e.clientY);
+    if (!pos) return null;
+    const col = Math.floor(pos.x / BLOCK_SIZE);
+    const row = Math.floor(pos.y / BLOCK_SIZE);
     if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return null;
     return { col, row };
-  }, []);
+  }, [screenToCanvas]);
 
   const normalizeSelection = useCallback(
     (start: { col: number; row: number }, end: { col: number; row: number }): Selection => {
@@ -43,11 +58,17 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      // Middle click or space+click for panning
+      if (e.button === 1 || (e.button === 0 && e.altKey)) {
+        e.preventDefault();
+        setIsPanning(true);
+        panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+        return;
+      }
       if (e.button !== 0) return;
       const coords = getBlockCoords(e);
       if (!coords) return;
 
-      // Check if clicking on a region
       const region = getRegionAt(coords.col, coords.row);
       if (region) {
         onRegionClick(region.id);
@@ -59,16 +80,22 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
       setDragEnd(coords);
       onSelectionChange(null);
     },
-    [getBlockCoords, getRegionAt, onRegionClick, onSelectionChange]
+    [getBlockCoords, getRegionAt, onRegionClick, onSelectionChange, pan]
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (isPanning) {
+        const dx = e.clientX - panStartRef.current.x;
+        const dy = e.clientY - panStartRef.current.y;
+        setPan({ x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy });
+        return;
+      }
+
       const coords = getBlockCoords(e);
       if (!coords) return;
       setHoveredBlock(coords);
 
-      // Tooltip for occupied regions
       const region = getRegionAt(coords.col, coords.row);
       if (region && !isDragging) {
         const canvas = canvasRef.current!;
@@ -86,10 +113,14 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         setDragEnd(coords);
       }
     },
-    [getBlockCoords, isDragging, dragStart, getRegionAt]
+    [getBlockCoords, isDragging, dragStart, getRegionAt, isPanning]
   );
 
   const handleMouseUp = useCallback(() => {
+    if (isPanning) {
+      setIsPanning(false);
+      return;
+    }
     if (isDragging && dragStart && dragEnd) {
       const sel = normalizeSelection(dragStart, dragEnd);
       if (!hasOverlap(sel)) {
@@ -99,17 +130,51 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
     setIsDragging(false);
     setDragStart(null);
     setDragEnd(null);
-  }, [isDragging, dragStart, dragEnd, normalizeSelection, hasOverlap, onSelectionChange]);
+  }, [isPanning, isDragging, dragStart, dragEnd, normalizeSelection, hasOverlap, onSelectionChange]);
 
   const handleMouseLeave = useCallback(() => {
     setHoveredBlock(null);
     setTooltipInfo(null);
+    if (isPanning) setIsPanning(false);
     if (isDragging) {
       setIsDragging(false);
       setDragStart(null);
       setDragEnd(null);
     }
-  }, [isDragging]);
+  }, [isDragging, isPanning]);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * zoomFactor));
+
+    // Zoom towards mouse position
+    const scale = newZoom / zoom;
+    const newPanX = mouseX - scale * (mouseX - pan.x);
+    const newPanY = mouseY - scale * (mouseY - pan.y);
+
+    setZoom(newZoom);
+    setPan({ x: newPanX, y: newPanY });
+  }, [zoom, pan]);
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    setZoom(z => Math.min(MAX_ZOOM, z * 1.3));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setZoom(z => Math.max(MIN_ZOOM, z * 0.7));
+  }, []);
 
   // Draw loop
   useEffect(() => {
@@ -119,12 +184,17 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
     if (!ctx) return;
 
     const draw = () => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#0E0E11";
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Apply pan and zoom
+      ctx.setTransform(zoom, 0, 0, zoom, pan.x, pan.y);
 
       // Grid lines
       ctx.strokeStyle = "rgba(31, 31, 36, 0.7)";
-      ctx.lineWidth = 0.5;
+      ctx.lineWidth = 0.5 / zoom;
       for (let c = 0; c <= GRID_COLS; c++) {
         ctx.beginPath();
         ctx.moveTo(c * BLOCK_SIZE, 0);
@@ -138,7 +208,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         ctx.stroke();
       }
 
-      // Render regions with images
+      // Render regions
       const now = Date.now();
       for (const region of regions) {
         const rx = region.startX * BLOCK_SIZE;
@@ -154,34 +224,29 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
           ctx.fillRect(rx, ry, rw, rh);
         }
 
-        // Highlight overlay
         if (region.isHighlighted && (!region.highlightExpiresAt || region.highlightExpiresAt > now)) {
           ctx.fillStyle = "rgba(255, 215, 0, 0.12)";
           ctx.fillRect(rx, ry, rw, rh);
         }
 
-        // Animated glow border
         if (region.hasGlowBorder && (!region.glowExpiresAt || region.glowExpiresAt > now)) {
           const pulse = 0.5 + 0.5 * Math.sin(now / 300);
           ctx.shadowColor = `rgba(0, 210, 255, ${0.4 + pulse * 0.6})`;
-          ctx.shadowBlur = 8 + pulse * 8;
+          ctx.shadowBlur = (8 + pulse * 8) / zoom;
           ctx.strokeStyle = `rgba(0, 210, 255, ${0.6 + pulse * 0.4})`;
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 2 / zoom;
           ctx.strokeRect(rx, ry, rw, rh);
           ctx.shadowColor = "transparent";
           ctx.shadowBlur = 0;
         } else {
-          // Normal border
           ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.6)" : "rgba(100, 70, 180, 0.4)";
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1 / zoom;
           ctx.strokeRect(rx, ry, rw, rh);
         }
 
-        // Trending badge
         if (region.isTrending && (!region.trendingExpiresAt || region.trendingExpiresAt > now)) {
           ctx.fillStyle = "rgba(255, 140, 0, 0.9)";
-          const bw = 6; const bh = 6;
-          ctx.fillRect(rx, ry, bw, bh);
+          ctx.fillRect(rx, ry, 6, 6);
         }
       }
 
@@ -190,22 +255,17 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         ctx.fillStyle = "rgba(0, 224, 255, 0.15)";
         ctx.fillRect(hoveredBlock.col * BLOCK_SIZE, hoveredBlock.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         ctx.strokeStyle = "rgba(0, 224, 255, 0.5)";
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 / zoom;
         ctx.strokeRect(hoveredBlock.col * BLOCK_SIZE, hoveredBlock.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
       }
 
-      // Hover on occupied block - glow
+      // Hover on occupied block
       if (hoveredBlock && isOccupied(hoveredBlock.col, hoveredBlock.row)) {
         const region = getRegionAt(hoveredBlock.col, hoveredBlock.row);
         if (region) {
           ctx.strokeStyle = "rgba(0, 224, 255, 0.8)";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(
-            region.startX * BLOCK_SIZE,
-            region.startY * BLOCK_SIZE,
-            region.width * BLOCK_SIZE,
-            region.height * BLOCK_SIZE
-          );
+          ctx.lineWidth = 2 / zoom;
+          ctx.strokeRect(region.startX * BLOCK_SIZE, region.startY * BLOCK_SIZE, region.width * BLOCK_SIZE, region.height * BLOCK_SIZE);
         }
       }
 
@@ -216,17 +276,16 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         ctx.fillStyle = overlap ? "rgba(220, 50, 50, 0.25)" : "rgba(0, 224, 255, 0.20)";
         ctx.fillRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
         ctx.strokeStyle = overlap ? "rgba(220, 50, 50, 0.8)" : "rgba(0, 224, 255, 0.8)";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 / zoom;
         ctx.strokeRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
 
-        // Dimension label
         const text = `${sel.width}×${sel.height} (${sel.width * sel.height})`;
-        ctx.font = "bold 11px 'Space Grotesk', sans-serif";
+        ctx.font = `bold ${11 / zoom}px 'Space Grotesk', sans-serif`;
         const metrics = ctx.measureText(text);
         const lx = sel.col * BLOCK_SIZE + (sel.width * BLOCK_SIZE) / 2 - metrics.width / 2;
-        const ly = sel.row * BLOCK_SIZE - 6;
+        const ly = sel.row * BLOCK_SIZE - 6 / zoom;
         ctx.fillStyle = "rgba(14, 14, 17, 0.9)";
-        ctx.fillRect(lx - 4, ly - 11, metrics.width + 8, 16);
+        ctx.fillRect(lx - 4 / zoom, ly - 11 / zoom, metrics.width + 8 / zoom, 16 / zoom);
         ctx.fillStyle = overlap ? "#dc3232" : "#00E0FF";
         ctx.fillText(text, lx, ly);
       }
@@ -236,8 +295,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         ctx.fillStyle = "rgba(0, 224, 255, 0.10)";
         ctx.fillRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
         ctx.strokeStyle = "rgba(0, 224, 255, 0.9)";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 2 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
         ctx.strokeRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
         ctx.setLineDash([]);
       }
@@ -247,21 +306,38 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
 
     animRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animRef.current);
-  }, [regions, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd, selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt]);
+  }, [regions, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd, selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan]);
 
   return (
-    <div className="relative flex-1 overflow-auto flex items-center justify-center bg-background p-2">
+    <div ref={containerRef} className="relative flex-1 overflow-hidden flex items-center justify-center bg-background p-2">
       <canvas
         ref={canvasRef}
         width={CANVAS_W}
         height={CANVAS_H}
-        className="max-w-full max-h-full border border-border rounded-sm cursor-crosshair"
+        className={`max-w-full max-h-full border border-border rounded-sm ${isPanning ? "cursor-grabbing" : "cursor-crosshair"}`}
         style={{ imageRendering: "pixelated" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
       />
+
+      {/* Zoom controls */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-card/90 border border-border rounded-md backdrop-blur-sm p-1">
+        <button onClick={zoomOut} className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground" title="Zoom out">
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <span className="text-xs font-mono text-muted-foreground w-12 text-center">{Math.round(zoom * 100)}%</span>
+        <button onClick={zoomIn} className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground" title="Zoom in">
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <div className="w-px h-4 bg-border" />
+        <button onClick={resetView} className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground" title="Reset view">
+          <Maximize className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* Coord overlay */}
       {hoveredBlock && !isDragging && (
         <div className="absolute bottom-4 left-4 px-2 py-1 rounded bg-card/90 border border-border text-xs font-mono text-muted-foreground backdrop-blur-sm">
