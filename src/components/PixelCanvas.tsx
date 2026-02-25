@@ -119,11 +119,11 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
     if (!ctx) return;
 
     const draw = () => {
-      ctx.fillStyle = "#0a0e17";
+      ctx.fillStyle = "#0E0E11";
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
       // Grid lines
-      ctx.strokeStyle = "rgba(40, 50, 70, 0.5)";
+      ctx.strokeStyle = "rgba(31, 31, 36, 0.7)";
       ctx.lineWidth = 0.5;
       for (let c = 0; c <= GRID_COLS; c++) {
         ctx.beginPath();
@@ -187,9 +187,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
 
       // Hover highlight
       if (hoveredBlock && !isDragging && !isOccupied(hoveredBlock.col, hoveredBlock.row)) {
-        ctx.fillStyle = "rgba(0, 210, 190, 0.18)";
+        ctx.fillStyle = "rgba(0, 224, 255, 0.15)";
         ctx.fillRect(hoveredBlock.col * BLOCK_SIZE, hoveredBlock.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-        ctx.strokeStyle = "rgba(0, 210, 190, 0.5)";
+        ctx.strokeStyle = "rgba(0, 224, 255, 0.5)";
         ctx.lineWidth = 1;
         ctx.strokeRect(hoveredBlock.col * BLOCK_SIZE, hoveredBlock.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
       }
@@ -198,7 +198,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
       if (hoveredBlock && isOccupied(hoveredBlock.col, hoveredBlock.row)) {
         const region = getRegionAt(hoveredBlock.col, hoveredBlock.row);
         if (region) {
-          ctx.strokeStyle = "rgba(0, 210, 190, 0.8)";
+          ctx.strokeStyle = "rgba(0, 224, 255, 0.8)";
           ctx.lineWidth = 2;
           ctx.strokeRect(
             region.startX * BLOCK_SIZE,
@@ -213,9 +213,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
       if (isDragging && dragStart && dragEnd) {
         const sel = normalizeSelection(dragStart, dragEnd);
         const overlap = hasOverlap(sel);
-        ctx.fillStyle = overlap ? "rgba(220, 50, 50, 0.25)" : "rgba(0, 210, 190, 0.2)";
+        ctx.fillStyle = overlap ? "rgba(220, 50, 50, 0.25)" : "rgba(0, 224, 255, 0.20)";
         ctx.fillRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
-        ctx.strokeStyle = overlap ? "rgba(220, 50, 50, 0.8)" : "rgba(0, 210, 190, 0.8)";
+        ctx.strokeStyle = overlap ? "rgba(220, 50, 50, 0.8)" : "rgba(0, 224, 255, 0.8)";
         ctx.lineWidth = 2;
         ctx.strokeRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
 
@@ -225,17 +225,17 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         const metrics = ctx.measureText(text);
         const lx = sel.col * BLOCK_SIZE + (sel.width * BLOCK_SIZE) / 2 - metrics.width / 2;
         const ly = sel.row * BLOCK_SIZE - 6;
-        ctx.fillStyle = "rgba(10, 14, 23, 0.85)";
+        ctx.fillStyle = "rgba(14, 14, 17, 0.9)";
         ctx.fillRect(lx - 4, ly - 11, metrics.width + 8, 16);
-        ctx.fillStyle = overlap ? "#dc3232" : "#00d2be";
+        ctx.fillStyle = overlap ? "#dc3232" : "#00E0FF";
         ctx.fillText(text, lx, ly);
       }
 
       // Finalized selection
       if (selection && !isDragging) {
-        ctx.fillStyle = "rgba(0, 210, 190, 0.12)";
+        ctx.fillStyle = "rgba(0, 224, 255, 0.10)";
         ctx.fillRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
-        ctx.strokeStyle = "rgba(0, 210, 190, 0.9)";
+        ctx.strokeStyle = "rgba(0, 224, 255, 0.9)";
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         ctx.strokeRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
