@@ -139,36 +139,50 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
       }
 
       // Render regions with images
+      const now = Date.now();
       for (const region of regions) {
+        const rx = region.startX * BLOCK_SIZE;
+        const ry = region.startY * BLOCK_SIZE;
+        const rw = region.width * BLOCK_SIZE;
+        const rh = region.height * BLOCK_SIZE;
+
         const img = loadedImages.get(region.id);
         if (img) {
-          ctx.drawImage(
-            img,
-            region.startX * BLOCK_SIZE,
-            region.startY * BLOCK_SIZE,
-            region.width * BLOCK_SIZE,
-            region.height * BLOCK_SIZE
-          );
-        }
-        // Occupied tint for regions without image
-        if (!img) {
+          ctx.drawImage(img, rx, ry, rw, rh);
+        } else {
           ctx.fillStyle = "rgba(100, 70, 180, 0.15)";
-          ctx.fillRect(
-            region.startX * BLOCK_SIZE,
-            region.startY * BLOCK_SIZE,
-            region.width * BLOCK_SIZE,
-            region.height * BLOCK_SIZE
-          );
+          ctx.fillRect(rx, ry, rw, rh);
         }
-        // Region border
-        ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.6)" : "rgba(100, 70, 180, 0.4)";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(
-          region.startX * BLOCK_SIZE,
-          region.startY * BLOCK_SIZE,
-          region.width * BLOCK_SIZE,
-          region.height * BLOCK_SIZE
-        );
+
+        // Highlight overlay
+        if (region.isHighlighted && (!region.highlightExpiresAt || region.highlightExpiresAt > now)) {
+          ctx.fillStyle = "rgba(255, 215, 0, 0.12)";
+          ctx.fillRect(rx, ry, rw, rh);
+        }
+
+        // Animated glow border
+        if (region.hasGlowBorder && (!region.glowExpiresAt || region.glowExpiresAt > now)) {
+          const pulse = 0.5 + 0.5 * Math.sin(now / 300);
+          ctx.shadowColor = `rgba(0, 210, 255, ${0.4 + pulse * 0.6})`;
+          ctx.shadowBlur = 8 + pulse * 8;
+          ctx.strokeStyle = `rgba(0, 210, 255, ${0.6 + pulse * 0.4})`;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(rx, ry, rw, rh);
+          ctx.shadowColor = "transparent";
+          ctx.shadowBlur = 0;
+        } else {
+          // Normal border
+          ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.6)" : "rgba(100, 70, 180, 0.4)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(rx, ry, rw, rh);
+        }
+
+        // Trending badge
+        if (region.isTrending && (!region.trendingExpiresAt || region.trendingExpiresAt > now)) {
+          ctx.fillStyle = "rgba(255, 140, 0, 0.9)";
+          const bw = 6; const bh = 6;
+          ctx.fillRect(rx, ry, bw, bh);
+        }
       }
 
       // Hover highlight

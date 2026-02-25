@@ -6,6 +6,7 @@ import CanvasToolbar from "@/components/CanvasToolbar";
 import PurchasePanel from "@/components/PurchasePanel";
 import RegionSidebar from "@/components/RegionSidebar";
 import MarketplaceView from "@/components/MarketplaceView";
+import TrendingSidebar from "@/components/TrendingSidebar";
 
 const IndexInner = () => {
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -57,6 +58,7 @@ const IndexInner = () => {
       <div className="flex flex-1 overflow-hidden relative">
         {view === "canvas" ? (
           <>
+            <TrendingSidebar onSelectRegion={handleRegionClick} />
             <div className="flex-1 flex relative overflow-hidden">
               <PixelCanvas
                 selection={selection}

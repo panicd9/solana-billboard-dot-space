@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { Region, Selection, GRID_COLS, GRID_ROWS, PRICE_PER_BLOCK } from "@/types/region";
+import { Region, Selection, GRID_COLS, GRID_ROWS, PRICE_PER_BLOCK, PREMIUM_DURATION } from "@/types/region";
 
 interface RegionContextType {
   regions: Region[];
@@ -15,6 +15,10 @@ interface RegionContextType {
   listRegion: (regionId: string, price: number) => void;
   unlistRegion: (regionId: string) => void;
   buyListedRegion: (regionId: string, buyerAddress: string) => void;
+  highlightRegion: (regionId: string) => void;
+  glowRegion: (regionId: string) => void;
+  trendRegion: (regionId: string) => void;
+  trendingRegions: Region[];
   loadedImages: Map<string, HTMLImageElement>;
 }
 
@@ -81,6 +85,9 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         purchasePrice: totalBlocks * PRICE_PER_BLOCK,
         isListed: false,
         createdAt: Date.now(),
+        isHighlighted: false,
+        hasGlowBorder: false,
+        isTrending: false,
       };
       setRegions((prev) => [...prev, region]);
       setOccupancy((prev) => {
@@ -131,6 +138,32 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
+  const highlightRegion = useCallback((regionId: string) => {
+    setRegions((prev) =>
+      prev.map((r) =>
+        r.id === regionId ? { ...r, isHighlighted: true, highlightExpiresAt: Date.now() + PREMIUM_DURATION } : r
+      )
+    );
+  }, []);
+
+  const glowRegion = useCallback((regionId: string) => {
+    setRegions((prev) =>
+      prev.map((r) =>
+        r.id === regionId ? { ...r, hasGlowBorder: true, glowExpiresAt: Date.now() + PREMIUM_DURATION } : r
+      )
+    );
+  }, []);
+
+  const trendRegion = useCallback((regionId: string) => {
+    setRegions((prev) =>
+      prev.map((r) =>
+        r.id === regionId ? { ...r, isTrending: true, trendingExpiresAt: Date.now() + PREMIUM_DURATION } : r
+      )
+    );
+  }, []);
+
+  const trendingRegions = regions.filter((r) => r.isTrending && (!r.trendingExpiresAt || r.trendingExpiresAt > Date.now()));
+
   return (
     <RegionContext.Provider
       value={{
@@ -147,6 +180,10 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         listRegion,
         unlistRegion,
         buyListedRegion,
+        highlightRegion,
+        glowRegion,
+        trendRegion,
+        trendingRegions,
         loadedImages,
       }}
     >
