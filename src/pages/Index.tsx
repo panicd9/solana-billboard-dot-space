@@ -13,6 +13,7 @@ const IndexInner = () => {
   const [view, setView] = useState<"canvas" | "marketplace">("canvas");
   const [purchasePanelOpen, setPurchasePanelOpen] = useState(false);
   const [purchasePanelCollapsed, setPurchasePanelCollapsed] = useState(false);
+  const [trendingCollapsed, setTrendingCollapsed] = useState(false);
   const { regions, setSelectedRegion, selectedRegion } = useRegions();
 
   const handleRegionClick = useCallback(
@@ -58,7 +59,11 @@ const IndexInner = () => {
       <div className="flex flex-1 overflow-hidden relative">
         {view === "canvas" ? (
           <>
-            <TrendingSidebar onSelectRegion={handleRegionClick} />
+            <TrendingSidebar
+              onSelectRegion={handleRegionClick}
+              collapsed={trendingCollapsed}
+              onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
+            />
             <div className="flex-1 flex relative overflow-hidden">
               <PixelCanvas
                 selection={selection}
