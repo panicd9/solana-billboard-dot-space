@@ -1,12 +1,12 @@
 import { useState, useRef } from "react";
-import { X, ExternalLink, Tag, XCircle, ShoppingCart, Image, Link, Pencil } from "lucide-react";
+import { X, ExternalLink, Tag, XCircle, ShoppingCart, Image, Link, Sparkles, Zap, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
-import { BLOCK_SIZE } from "@/types/region";
+import { BLOCK_SIZE, HIGHLIGHT_COST, GLOW_COST, TRENDING_COST } from "@/types/region";
 
 const RegionSidebar = () => {
-  const { selectedRegion, setSelectedRegion, listRegion, unlistRegion, buyListedRegion, setRegionImage, setRegionLink } = useRegions();
+  const { selectedRegion, setSelectedRegion, listRegion, unlistRegion, buyListedRegion, setRegionImage, setRegionLink, highlightRegion, glowRegion, trendRegion } = useRegions();
   const [listPrice, setListPrice] = useState("");
   const [editingLink, setEditingLink] = useState(false);
   const [linkValue, setLinkValue] = useState("");
@@ -152,6 +152,41 @@ const RegionSidebar = () => {
             {r.linkUrl ? "Edit URL" : "Add URL"}
           </Button>
         )}
+      </div>
+
+      {/* Premium Actions */}
+      <div className="px-4 pb-2 space-y-2 border-t border-border pt-3">
+        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Premium Boosts</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          disabled={r.isHighlighted}
+          onClick={() => { highlightRegion(r.id); toast.success(`Region highlighted for 24h! (${HIGHLIGHT_COST} SOL)`); }}
+        >
+          <Sparkles className="w-4 h-4 text-yellow-400" />
+          {r.isHighlighted ? "Highlighted ✓" : `Highlight (${HIGHLIGHT_COST} SOL)`}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          disabled={r.hasGlowBorder}
+          onClick={() => { glowRegion(r.id); toast.success(`Glow border active for 24h! (${GLOW_COST} SOL)`); }}
+        >
+          <Zap className="w-4 h-4 text-cyan-400" />
+          {r.hasGlowBorder ? "Glowing ✓" : `Border Glow (${GLOW_COST} SOL)`}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          disabled={r.isTrending}
+          onClick={() => { trendRegion(r.id); toast.success(`Pinned to Trending for 24h! (${TRENDING_COST} SOL)`); }}
+        >
+          <TrendingUp className="w-4 h-4 text-orange-400" />
+          {r.isTrending ? "Trending ✓" : `Pin Trending (${TRENDING_COST} SOL)`}
+        </Button>
       </div>
 
       <div className="p-4 border-t border-border space-y-2 mt-auto">

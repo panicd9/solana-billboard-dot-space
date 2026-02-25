@@ -111,7 +111,7 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
   }
 
   return (
-    <div className="w-80 bg-card border-l border-border flex flex-col h-full overflow-y-auto shrink-0">
+    <div className="w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto shrink-0">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground">Purchase Region</h3>
         <div className="flex items-center gap-1">

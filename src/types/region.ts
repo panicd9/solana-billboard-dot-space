@@ -11,7 +11,19 @@ export interface Region {
   isListed: boolean;
   listingPrice?: number;
   createdAt: number;
+  // Premium features
+  isHighlighted: boolean;
+  highlightExpiresAt?: number;
+  hasGlowBorder: boolean;
+  glowExpiresAt?: number;
+  isTrending: boolean;
+  trendingExpiresAt?: number;
 }
+
+export const HIGHLIGHT_COST = 0.05;
+export const GLOW_COST = 0.08;
+export const TRENDING_COST = 0.15;
+export const PREMIUM_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface Selection {
   col: number;
