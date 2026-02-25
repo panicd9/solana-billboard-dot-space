@@ -87,7 +87,7 @@ const RegionSidebar = () => {
       <div className="p-4 space-y-3 text-sm font-mono">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Owner</span>
-          <span className="text-foreground" title={r.owner}>{shortOwner}</span>
+          <a href={`https://solscan.io/account/${r.owner}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" title={r.owner}>{shortOwner}</a>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Position</span>
@@ -120,9 +120,9 @@ const RegionSidebar = () => {
           </div>
         )}
 
-        <a href="#" className="flex items-center gap-1 text-xs text-primary hover:underline" onClick={(e) => e.preventDefault()}>
+        <a href={`https://solscan.io/account/${r.owner}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
           <ExternalLink className="w-3 h-3" />
-          View on Explorer
+          View on Solscan
         </a>
       </div>
 
