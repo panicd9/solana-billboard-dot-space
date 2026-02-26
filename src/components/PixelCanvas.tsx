@@ -29,6 +29,19 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
+  const clampPan = useCallback((px: number, py: number, z: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: px, y: py };
+    const rect = canvas.getBoundingClientRect();
+    // Don't allow panning so the grid edge moves inward past the viewport edge
+    const minX = Math.min(0, rect.width - CANVAS_W * z);
+    const minY = Math.min(0, rect.height - CANVAS_H * z);
+    return {
+      x: Math.min(0, Math.max(minX, px)),
+      y: Math.min(0, Math.max(minY, py)),
+    };
+  }, []);
+
   const screenToCanvas = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -90,7 +103,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
       if (isPanning) {
         const dx = e.clientX - panStartRef.current.x;
         const dy = e.clientY - panStartRef.current.y;
-        setPan({ x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy });
+        setPan(clampPan(panStartRef.current.panX + dx, panStartRef.current.panY + dy, zoom));
         return;
       }
 
@@ -162,7 +175,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
     const newPanY = mouseY - scale * (mouseY - pan.y);
 
     setZoom(newZoom);
-    setPan({ x: newPanX, y: newPanY });
+    setPan(clampPan(newPanX, newPanY, newZoom));
   }, [zoom, pan]);
 
   const resetView = useCallback(() => {
