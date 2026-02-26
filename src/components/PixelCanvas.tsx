@@ -33,8 +33,10 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left - pan.x) / zoom;
-    const y = (clientY - rect.top - pan.y) / zoom;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = ((clientX - rect.left) * scaleX - pan.x) / zoom;
+    const y = ((clientY - rect.top) * scaleY - pan.y) / zoom;
     return { x, y };
   }, [pan, zoom]);
 
