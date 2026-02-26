@@ -9,7 +9,7 @@ interface Props {
   onRegionClick: (regionId: string) => void;
 }
 
-const MIN_ZOOM = 0.3;
+const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
 
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props) => {
