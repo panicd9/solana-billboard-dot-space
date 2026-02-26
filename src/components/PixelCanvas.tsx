@@ -32,10 +32,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
   const clampPan = useCallback((px: number, py: number, z: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: px, y: py };
-    const rect = canvas.getBoundingClientRect();
-    // Don't allow panning so the grid edge moves inward past the viewport edge
-    const minX = Math.min(0, rect.width - CANVAS_W * z);
-    const minY = Math.min(0, rect.height - CANVAS_H * z);
+    // Pan operates in canvas logical coordinates, use canvas.width not rect.width
+    const minX = Math.min(0, canvas.width - CANVAS_W * z);
+    const minY = Math.min(0, canvas.height - CANVAS_H * z);
     return {
       x: Math.min(0, Math.max(minX, px)),
       y: Math.min(0, Math.max(minY, py)),
