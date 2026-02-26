@@ -2,9 +2,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Wallet, LayoutGrid, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo1 from "@/assets/logo-option-1.png";
-import logo2 from "@/assets/logo-option-2.png";
-import logo3 from "@/assets/logo-option-3.png";
+import logo from "@/assets/logo.png";
 
 interface Props {
   view: "canvas" | "marketplace";
@@ -22,17 +20,11 @@ const CanvasToolbar = ({ view, onViewChange }: Props) => {
   return (
     <header className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3 border border-border rounded-lg p-1.5">
-          <img src={logo1} alt="Logo option 1" className="w-8 h-8 rounded" />
-          <span className="text-[10px] text-muted-foreground">1</span>
-          <img src={logo2} alt="Logo option 2" className="w-8 h-8 rounded" />
-          <span className="text-[10px] text-muted-foreground">2</span>
-          <img src={logo3} alt="Logo option 3" className="w-8 h-8 rounded" />
-          <span className="text-[10px] text-muted-foreground">3</span>
-        </div>
+        <img src={logo} alt="Solanabillboard.space" className="w-8 h-8 rounded" />
         <h1 className="text-base font-semibold tracking-tight">
-          <span className="text-primary text-glow">Sol</span>
-          <span className="text-foreground">Canvas</span>
+          <span className="text-primary text-glow">Solana</span>
+          <span className="text-foreground">billboard</span>
+          <span className="text-muted-foreground">.space</span>
         </h1>
       </div>
 
