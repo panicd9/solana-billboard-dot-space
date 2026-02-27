@@ -7,19 +7,28 @@ if (!globalThis.crypto) {
 }
 
 /**
- * Full localnet setup after `surfpool start`:
- *   1. Fund USDC-dev token accounts via Surfnet cheatcode
- *   2. Initialize the Solana Space program (CanvasState + Collection)
+ * Setup script for Solana Space program.
+ *
+ * --localnet (default):
+ *   Full setup after `surfpool start` — clones USDC-dev mint, funds wallets
+ *   via Surfnet cheatcodes, then initializes the program.
+ *
+ * --devnet:
+ *   Airdrops SOL via requestAirdrop, then initializes the program.
+ *   USDC-dev mint already exists on devnet — fund via Circle faucet:
+ *   https://faucet.circle.com/
  *
  * Wallets funded:
  *   - AZosm5HB5MdUXmG3uCmMMr1A6h5j1wVh3QqSSaFskUim  (local keypair / treasury)
  *   - 7PWXvQBKnr5L6CZMvR5EgbeaniGNhgRxfAq144Nhn5YH  (second wallet)
  *
  * Usage (from project root):
- *   npx tsx solana-space/scripts/setup-usdc-dev.ts
+ *   npx tsx solana-space/scripts/setup-usdc-dev.ts              # localnet (default)
+ *   npx tsx solana-space/scripts/setup-usdc-dev.ts --localnet   # explicit localnet
+ *   npx tsx solana-space/scripts/setup-usdc-dev.ts --devnet     # devnet
  *
- * Env vars:
- *   RPC_URL      — defaults to http://127.0.0.1:8899
+ * Env vars (override defaults):
+ *   RPC_URL      — defaults based on network flag
  *   KEYPAIR_PATH — defaults to ~/.config/solana/id.json
  */
 
@@ -41,9 +50,27 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
+// ── CLI Flags ───────────────────────────────────────────────────────
+
+type Network = "localnet" | "devnet";
+
+function parseNetwork(): Network {
+  const args = process.argv.slice(2);
+  if (args.includes("--devnet")) return "devnet";
+  if (args.includes("--localnet")) return "localnet";
+  return "localnet"; // default
+}
+
+const NETWORK = parseNetwork();
+
 // ── Config ──────────────────────────────────────────────────────────
 
-const RPC_URL = process.env.RPC_URL ?? "http://127.0.0.1:8899";
+const RPC_DEFAULTS: Record<Network, string> = {
+  localnet: "http://127.0.0.1:8899",
+  devnet: "https://api.devnet.solana.com",
+};
+
+const RPC_URL = process.env.RPC_URL || RPC_DEFAULTS[NETWORK];
 const KEYPAIR_PATH =
   process.env.KEYPAIR_PATH ??
   path.join(os.homedir(), ".config", "solana", "id.json");
@@ -203,6 +230,37 @@ async function airdropSol() {
   console.log();
 }
 
+// ── Step 1b: Airdrop SOL via devnet requestAirdrop ──────────────────
+
+const DEVNET_AIRDROP_AMOUNT = 2 * 1_000_000_000; // 2 SOL (devnet max per request)
+
+async function airdropSolDevnet() {
+  console.log("=== Step 1: Airdrop SOL (devnet) ===");
+  console.log(
+    `Amount: ${DEVNET_AIRDROP_AMOUNT / 1_000_000_000} SOL per wallet (devnet limit)`
+  );
+  console.log();
+
+  const rpc = createSolanaRpc(RPC_URL);
+
+  for (const wallet of WALLETS) {
+    console.log(`  Requesting airdrop for ${wallet} ...`);
+    try {
+      const sig = await rpc
+        .requestAirdrop(wallet as Address, BigInt(DEVNET_AIRDROP_AMOUNT))
+        .send();
+      console.log(`  Signature: ${sig}`);
+    } catch (err) {
+      console.warn(
+        `  Airdrop failed (rate-limited?): ${err instanceof Error ? err.message : err}`
+      );
+      console.warn(`  Fund manually: solana airdrop 2 ${wallet} --url devnet`);
+    }
+  }
+
+  console.log();
+}
+
 // ── Step 2: Fund USDC-dev token accounts ────────────────────────────
 
 async function setupTokenAccounts() {
@@ -288,19 +346,32 @@ async function initializeProgram() {
 // ── Main ────────────────────────────────────────────────────────────
 
 async function main() {
+  const label = NETWORK === "devnet" ? "Devnet" : "Localnet";
+  const envFile = NETWORK === "devnet" ? ".env.devnet" : ".env";
+
   console.log("============================================================");
-  console.log("  Solana Space — Localnet Setup (USDC-dev)");
+  console.log(`  Solana Space — ${label} Setup (USDC-dev)`);
   console.log("============================================================");
+  console.log(`  Network: ${NETWORK}`);
+  console.log(`  RPC:     ${RPC_URL}`);
   console.log();
 
-  await cloneMintFromDevnet();
-  await airdropSol();
-  await setupTokenAccounts();
+  if (NETWORK === "localnet") {
+    await cloneMintFromDevnet();
+    await airdropSol();
+    await setupTokenAccounts();
+  } else {
+    await airdropSolDevnet();
+    console.log("  USDC-dev mint already exists on devnet.");
+    console.log("  Fund USDC-dev via Circle faucet: https://faucet.circle.com/");
+    console.log();
+  }
+
   const collectionAddress = await initializeProgram();
 
   console.log();
   console.log("============================================================");
-  console.log("  Setup Complete — add to your .env:");
+  console.log(`  Setup Complete — add to your ${envFile}:`);
   console.log("============================================================");
   console.log();
   console.log(`  VITE_USDC_MINT=${USDC_DEV_MINT}`);
