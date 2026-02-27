@@ -86,17 +86,19 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
   // Preload images for canvas rendering
   useEffect(() => {
     for (const region of regions) {
-      if (region.imageUrl && !loadedImages.has(region.id)) {
-        const img = new Image();
-        img.onload = () => {
-          setLoadedImages((prev) => {
-            const next = new Map(prev);
-            next.set(region.id, img);
-            return next;
-          });
-        };
-        img.src = region.imageUrl;
-      }
+      if (!region.imageUrl) continue;
+      const existing = loadedImages.get(region.id);
+      // Load if missing or if the URL changed (image was updated)
+      if (existing && existing.src === region.imageUrl) continue;
+      const img = new Image();
+      img.onload = () => {
+        setLoadedImages((prev) => {
+          const next = new Map(prev);
+          next.set(region.id, img);
+          return next;
+        });
+      };
+      img.src = region.imageUrl;
     }
   }, [regions, loadedImages]);
 
