@@ -20,7 +20,7 @@ import {
   useBuyBoost,
 } from "@/hooks/useProgramTransactions";
 import { calculateRegionPrice, formatUsdc } from "@/solana/pricing";
-import { uploadToIpfs } from "@/solana/ipfs";
+import { ipfsToGateway } from "@/solana/accounts";
 
 interface RegionContextType {
   regions: Region[];
@@ -99,6 +99,14 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [regions, loadedImages]);
+
+  // Keep selectedRegion in sync when regions cache updates (optimistic or refetch)
+  useEffect(() => {
+    if (!selectedRegion || selectedRegion.id.startsWith("bitmap-")) return;
+    const updated = regions.find((r) => r.id === selectedRegion.id);
+    if (updated) setSelectedRegion(updated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regions]);
 
   const isOccupied = useCallback(
     (col: number, row: number) => occupancy.has(`${col}:${row}`),
@@ -209,16 +217,17 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         link,
       });
 
-      // Return a provisional Region object while the query refetches
+      // Cache was already updated optimistically by the mutation hook;
+      // return matching Region so callers have immediate data.
       return {
         id: result.assetAddress as string,
         startX: sel.col,
         startY: sel.row,
         width: sel.width,
         height: sel.height,
-        owner: "",
-        imageUrl: "",
-        imageUri: "",
+        owner: result.owner,
+        imageUrl: ipfsToGateway(result.imageUri),
+        imageUri: result.imageUri,
         linkUrl: link,
         purchasePrice: 0,
         isListed: false,

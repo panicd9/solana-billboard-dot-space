@@ -58,7 +58,11 @@ const RegionSidebar = () => {
   const isBitmapOnly = r.id.startsWith("bitmap-");
   const shortOwner = r.owner ? `${r.owner.slice(0, 4)}...${r.owner.slice(-4)}` : "Unknown";
   const totalBlocks = r.width * r.height;
-  const isOwner = !isBitmapOnly && !!r.owner && wallet?.account?.address === r.owner;
+  const walletAddr = wallet?.account?.address;
+  const isOwner =
+    !isBitmapOnly &&
+    !!walletAddr &&
+    (walletAddr === r.owner || (r.isListed && walletAddr === r.listing?.seller));
 
   const currentListingPrice =
     r.isListed && r.listing
@@ -369,7 +373,7 @@ const RegionSidebar = () => {
                 ) : (
                   <XCircle className="w-4 h-4" />
                 )}
-                Unlist
+                Cancel Listing
               </Button>
             )}
             {!isOwner && currentListingPrice !== null && (

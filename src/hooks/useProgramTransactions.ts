@@ -5,12 +5,32 @@ import type { TransactionSigner } from "@solana/kit";
 import * as tx from "@/solana/transactions";
 import { uploadToIpfs } from "@/solana/ipfs";
 import { toast } from "sonner";
+import type { Region } from "@/types/region";
+import {
+  COLLECTION_ADDRESS,
+  BOOST_HIGHLIGHTED,
+  BOOST_GLOWING,
+  BOOST_TRENDING,
+} from "@/solana/constants";
+import { ipfsToGateway } from "@/solana/accounts";
 
 function useWalletSigner(): TransactionSigner | null {
   const session = useWalletSession();
   if (!session) return null;
   const { signer } = createWalletTransactionSigner(session);
   return signer;
+}
+
+/** Patch a single region in the regions query cache. */
+function patchRegion(
+  queryClient: ReturnType<typeof useQueryClient>,
+  assetAddress: string,
+  updater: (region: Region) => Region
+) {
+  queryClient.setQueryData<Region[]>(
+    ["regions", COLLECTION_ADDRESS],
+    (old) => old?.map((r) => (r.id === assetAddress ? updater(r) : r))
+  );
 }
 
 export function useMintRegion() {
@@ -45,10 +65,50 @@ export function useMintRegion() {
         link: params.link,
       });
 
-      return result;
+      return { ...result, imageUri, owner: signer.address as string };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast.success("Region minted successfully!");
+
+      // Instantly add the new region to cache
+      const newRegion: Region = {
+        id: data.assetAddress as string,
+        startX: variables.x,
+        startY: variables.y,
+        width: variables.width,
+        height: variables.height,
+        owner: data.owner,
+        imageUrl: ipfsToGateway(data.imageUri),
+        imageUri: data.imageUri,
+        linkUrl: variables.link,
+        purchasePrice: 0,
+        isListed: false,
+        listing: null,
+        createdAt: Date.now(),
+        boostFlags: 0,
+        isHighlighted: false,
+        hasGlowBorder: false,
+        isTrending: false,
+      };
+      queryClient.setQueryData<Region[]>(
+        ["regions", COLLECTION_ADDRESS],
+        (old) => (old ? [...old, newRegion] : [newRegion])
+      );
+
+      // Update canvasState occupancy bitmap
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      queryClient.setQueryData<any>(["canvasState"], (old: any) => {
+        if (!old) return old;
+        const next = new Set<string>(old.occupiedBlocks);
+        for (let y = variables.y; y < variables.y + variables.height; y++) {
+          for (let x = variables.x; x < variables.x + variables.width; x++) {
+            next.add(`${x}:${y}`);
+          }
+        }
+        return { ...old, occupiedBlocks: next };
+      });
+
+      // Background refetch for eventual consistency
       queryClient.invalidateQueries({ queryKey: ["canvasState"] });
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
@@ -70,10 +130,16 @@ export function useUpdateRegionImage() {
       const upload = await uploadToIpfs(params.imageFile);
 
       toast.info("Confirm transaction in your wallet...");
-      return tx.updateRegionImage(signer, params.assetAddress, upload.ipfsUri);
+      const signature = await tx.updateRegionImage(signer, params.assetAddress, upload.ipfsUri);
+      return { signature, ipfsUri: upload.ipfsUri };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast.success("Image updated!");
+      patchRegion(queryClient, variables.assetAddress, (r) => ({
+        ...r,
+        imageUri: data.ipfsUri,
+        imageUrl: ipfsToGateway(data.ipfsUri),
+      }));
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
     onError: (err) => {
@@ -93,8 +159,12 @@ export function useUpdateRegionLink() {
       toast.info("Confirm transaction in your wallet...");
       return tx.updateRegionLink(signer, params.assetAddress, params.link);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Link updated!");
+      patchRegion(queryClient, variables.assetAddress, (r) => ({
+        ...r,
+        linkUrl: variables.link,
+      }));
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
     onError: (err) => {
@@ -125,8 +195,20 @@ export function useCreateListing() {
         params.durationSeconds
       );
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Region listed!");
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      patchRegion(queryClient, variables.assetAddress, (r) => ({
+        ...r,
+        isListed: true,
+        listing: {
+          seller: (signer?.address ?? "") as string,
+          startPrice: variables.startPrice,
+          endPrice: variables.endPrice,
+          startTime: now,
+          endTime: now + variables.durationSeconds,
+        },
+      }));
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
     onError: (err) => {
@@ -146,8 +228,13 @@ export function useCancelListing() {
       toast.info("Confirm transaction in your wallet...");
       return tx.cancelListing(signer, assetAddress);
     },
-    onSuccess: () => {
+    onSuccess: (_data, assetAddress) => {
       toast.success("Listing cancelled!");
+      patchRegion(queryClient, assetAddress, (r) => ({
+        ...r,
+        isListed: false,
+        listing: null,
+      }));
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
     onError: (err) => {
@@ -168,14 +255,21 @@ export function useExecutePurchase() {
       if (!signer) throw new Error("Wallet not connected");
 
       toast.info("Confirm transaction in your wallet...");
-      return tx.executePurchase(
+      const signature = await tx.executePurchase(
         signer,
         params.sellerAddress,
         params.assetAddress
       );
+      return { signature, buyerAddress: signer.address as string };
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast.success("Region purchased!");
+      patchRegion(queryClient, variables.assetAddress, (r) => ({
+        ...r,
+        owner: data.buyerAddress,
+        isListed: false,
+        listing: null,
+      }));
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
     onError: (err) => {
@@ -195,8 +289,18 @@ export function useBuyBoost() {
       toast.info("Confirm transaction in your wallet...");
       return tx.buyBoost(signer, params.assetAddress, params.boostFlags);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Boost activated!");
+      patchRegion(queryClient, variables.assetAddress, (r) => {
+        const newFlags = r.boostFlags | variables.boostFlags;
+        return {
+          ...r,
+          boostFlags: newFlags,
+          isHighlighted: (newFlags & BOOST_HIGHLIGHTED) !== 0,
+          hasGlowBorder: (newFlags & BOOST_GLOWING) !== 0,
+          isTrending: (newFlags & BOOST_TRENDING) !== 0,
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ["regions"] });
     },
     onError: (err) => {
