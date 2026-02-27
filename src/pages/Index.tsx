@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Selection } from "@/types/region";
+import { type Selection, type Region } from "@/types/region";
 import { RegionProvider, useRegions } from "@/context/RegionContext";
 import PixelCanvas from "@/components/PixelCanvas";
 import CanvasToolbar from "@/components/CanvasToolbar";
@@ -14,18 +14,16 @@ const IndexInner = () => {
   const [purchasePanelOpen, setPurchasePanelOpen] = useState(false);
   const [purchasePanelCollapsed, setPurchasePanelCollapsed] = useState(false);
   const [trendingCollapsed, setTrendingCollapsed] = useState(false);
-  const { regions, setSelectedRegion, selectedRegion } = useRegions();
+  const [showPricingOverlay, setShowPricingOverlay] = useState(false);
+  const { setSelectedRegion, selectedRegion } = useRegions();
 
   const handleRegionClick = useCallback(
-    (regionId: string) => {
-      const region = regions.find((r) => r.id === regionId);
-      if (region) {
-        setSelectedRegion(region);
-        setSelection(null);
-        setPurchasePanelOpen(false);
-      }
+    (region: Region) => {
+      setSelectedRegion(region);
+      setSelection(null);
+      setPurchasePanelOpen(false);
     },
-    [regions, setSelectedRegion]
+    [setSelectedRegion]
   );
 
   const handleMarketplaceHighlight = useCallback(
@@ -69,6 +67,7 @@ const IndexInner = () => {
                 selection={selection}
                 onSelectionChange={handleSelectionChange}
                 onRegionClick={handleRegionClick}
+                showPricingOverlay={showPricingOverlay}
               />
             </div>
             {purchasePanelOpen && !selectedRegion && (
@@ -77,6 +76,8 @@ const IndexInner = () => {
                 onClearSelection={handleClearSelection}
                 collapsed={purchasePanelCollapsed}
                 onToggleCollapse={() => setPurchasePanelCollapsed((c) => !c)}
+                showPricingOverlay={showPricingOverlay}
+                onTogglePricingOverlay={() => setShowPricingOverlay((v) => !v)}
               />
             )}
             {selectedRegion && <RegionSidebar />}

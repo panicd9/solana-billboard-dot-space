@@ -24,8 +24,9 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/generated/*": ["./solana-space/clients/js/src/generated/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "solana-space/clients/js/src"]
 }

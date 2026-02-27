@@ -1,33 +1,55 @@
 import { useState, useRef, useEffect } from "react";
-import { X, ShoppingCart, Upload, Image as ImageIcon, ChevronRight, AlertTriangle, CheckCircle } from "lucide-react";
+import {
+  X,
+  ShoppingCart,
+  Image as ImageIcon,
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+  HelpCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Selection, PRICE_PER_BLOCK, BLOCK_SIZE } from "@/types/region";
+import { Selection, BLOCK_SIZE } from "@/types/region";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
+import { countCenterAndCurveBlocks, formatUsdc } from "@/solana/pricing";
+import {
+  CENTER_PRICE_PER_BLOCK,
+  CURVE_START_PRICE,
+  CURVE_END_PRICE,
+  USDC_DECIMALS,
+} from "@/solana/constants";
 
 interface Props {
   selection: Selection | null;
   onClearSelection: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  showPricingOverlay: boolean;
+  onTogglePricingOverlay: () => void;
 }
 
-const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollapse }: Props) => {
-  const { purchaseRegion, setRegionImage } = useRegions();
-  const [purchasedId, setPurchasedId] = useState<string | null>(null);
+const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollapse, showPricingOverlay, onTogglePricingOverlay }: Props) => {
+  const { purchaseRegion, calculatePrice } = useRegions();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [imageNaturalSize, setImageNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [linkValue, setLinkValue] = useState("");
+  const [isPurchasing, setIsPurchasing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Reset preview when a new (different) selection is finalized
   const prevSelectionRef = useRef<Selection | null>(null);
   useEffect(() => {
-    if (selection && prevSelectionRef.current && !purchasedId &&
+    if (
+      selection &&
+      prevSelectionRef.current &&
       (selection.col !== prevSelectionRef.current.col ||
-       selection.row !== prevSelectionRef.current.row ||
-       selection.width !== prevSelectionRef.current.width ||
-       selection.height !== prevSelectionRef.current.height)) {
+        selection.row !== prevSelectionRef.current.row ||
+        selection.width !== prevSelectionRef.current.width ||
+        selection.height !== prevSelectionRef.current.height)
+    ) {
       setPreviewUrl(null);
       setPendingFile(null);
       setImageNaturalSize(null);
@@ -35,19 +57,18 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
     if (selection) {
       prevSelectionRef.current = selection;
     }
-  }, [selection, purchasedId]);
+  }, [selection]);
 
   const totalBlocks = selection ? selection.width * selection.height : 0;
-  const totalCost = totalBlocks * PRICE_PER_BLOCK;
+  const price = selection ? calculatePrice(selection) : null;
 
   const regionPixelW = selection ? selection.width * BLOCK_SIZE : 0;
   const regionPixelH = selection ? selection.height * BLOCK_SIZE : 0;
-  const regionRatio = regionPixelW && regionPixelH ? (regionPixelW / regionPixelH) : 0;
-  const imageRatio = imageNaturalSize ? (imageNaturalSize.w / imageNaturalSize.h) : 0;
+  const regionRatio = regionPixelW && regionPixelH ? regionPixelW / regionPixelH : 0;
+  const imageRatio = imageNaturalSize ? imageNaturalSize.w / imageNaturalSize.h : 0;
 
-  const ratioMatch = regionRatio && imageRatio
-    ? Math.abs(regionRatio - imageRatio) / regionRatio
-    : null;
+  const ratioMatch =
+    regionRatio && imageRatio ? Math.abs(regionRatio - imageRatio) / regionRatio : null;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,31 +85,24 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
     e.target.value = "";
   };
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     if (!selection) return;
-    const region = purchaseRegion(selection);
-    setPurchasedId(region.id);
-
-    // If image was already selected before buying, apply it immediately
-    if (pendingFile) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setRegionImage(region.id, e.target?.result as string);
-        toast.success(`Purchased ${totalBlocks} blocks & image placed!`);
-        handleClose();
-      };
-      reader.readAsDataURL(pendingFile);
-    } else {
-      toast.success(`Purchased ${totalBlocks} blocks for ${totalCost.toFixed(4)} SOL`);
+    setIsPurchasing(true);
+    try {
+      await purchaseRegion(selection, pendingFile, linkValue);
       handleClose();
+    } catch (err) {
+      // Error toast is shown by the mutation hook
+    } finally {
+      setIsPurchasing(false);
     }
   };
 
   const handleClose = () => {
-    setPurchasedId(null);
     setPreviewUrl(null);
     setPendingFile(null);
     setImageNaturalSize(null);
+    setLinkValue("");
     onClearSelection();
   };
 
@@ -122,7 +136,10 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-          <button onClick={handleClose} className="text-muted-foreground hover:text-foreground p-0.5">
+          <button
+            onClick={handleClose}
+            className="text-muted-foreground hover:text-foreground p-0.5"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -133,27 +150,41 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
         <div className="p-4 space-y-2 text-sm font-mono border-b border-border">
           <div className="flex justify-between text-muted-foreground">
             <span>Position</span>
-            <span className="text-foreground">({selection.col}, {selection.row})</span>
+            <span className="text-foreground">
+              ({selection.col}, {selection.row})
+            </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Size</span>
-            <span className="text-primary">{selection.width}×{selection.height}</span>
+            <span className="text-primary">
+              {selection.width}x{selection.height}
+            </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Pixels</span>
-            <span className="text-foreground">{regionPixelW}×{regionPixelH}px</span>
+            <span className="text-foreground">
+              {regionPixelW}x{regionPixelH}px
+            </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Blocks</span>
             <span className="text-foreground">{totalBlocks}</span>
           </div>
-          <div className="flex justify-between text-muted-foreground">
-            <span>Price/block</span>
-            <span className="text-foreground">{PRICE_PER_BLOCK} SOL</span>
-          </div>
-          <div className="border-t border-border pt-2 flex justify-between font-semibold">
-            <span className="text-foreground">Total</span>
-            <span className="text-accent">{totalCost.toFixed(4)} SOL</span>
+          <div className="border-t border-border pt-2 space-y-2">
+            <div className="flex justify-between font-semibold items-center">
+              <div className="flex items-center gap-1.5">
+                <span className="text-foreground">Total</span>
+                <button
+                  onClick={onTogglePricingOverlay}
+                  className={`p-0.5 rounded transition-colors ${showPricingOverlay ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  title="How pricing works"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <span className="text-accent">{price?.display ?? "..."} USDC</span>
+            </div>
+            {showPricingOverlay && selection && <PricingBreakdown selection={selection} />}
           </div>
         </div>
       ) : (
@@ -167,50 +198,66 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
         <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
           Image Preview (optional)
         </p>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
 
         {previewUrl ? (
           <div className="space-y-3">
-            {/* Preview with region aspect ratio overlay */}
             <div
               className="border border-border rounded overflow-hidden bg-background relative"
-              style={{ aspectRatio: `${selection?.width ?? 1} / ${selection?.height ?? 1}` }}
+              style={{
+                aspectRatio: `${selection?.width ?? 1} / ${selection?.height ?? 1}`,
+              }}
             >
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="w-full h-full object-cover"
-              />
+              <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
             </div>
             <p className="text-xs text-muted-foreground text-center">
               Preview shows how the image will look in the region
             </p>
 
-            {/* Ratio match indicator */}
             {imageNaturalSize && selection && (
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-mono text-muted-foreground">
                   <span>Image</span>
-                  <span className="text-foreground">{imageNaturalSize.w}×{imageNaturalSize.h}px ({imageRatio.toFixed(2)})</span>
+                  <span className="text-foreground">
+                    {imageNaturalSize.w}x{imageNaturalSize.h}px ({imageRatio.toFixed(2)})
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs font-mono text-muted-foreground">
                   <span>Region</span>
-                  <span className="text-foreground">{regionPixelW}×{regionPixelH}px ({regionRatio.toFixed(2)})</span>
+                  <span className="text-foreground">
+                    {regionPixelW}x{regionPixelH}px ({regionRatio.toFixed(2)})
+                  </span>
                 </div>
                 {ratioMatch !== null && (
-                  <div className={`flex items-center gap-1.5 text-xs px-2 py-1.5 rounded ${
-                    ratioMatch < 0.1
-                      ? "bg-green-500/10 text-green-400"
-                      : ratioMatch < 0.3
-                        ? "bg-yellow-500/10 text-yellow-400"
-                        : "bg-red-500/10 text-red-400"
-                  }`}>
+                  <div
+                    className={`flex items-center gap-1.5 text-xs px-2 py-1.5 rounded ${
+                      ratioMatch < 0.1
+                        ? "bg-green-500/10 text-green-400"
+                        : ratioMatch < 0.3
+                          ? "bg-yellow-500/10 text-yellow-400"
+                          : "bg-red-500/10 text-red-400"
+                    }`}
+                  >
                     {ratioMatch < 0.1 ? (
-                      <><CheckCircle className="w-3.5 h-3.5 shrink-0" /> Good aspect ratio match</>
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5 shrink-0" /> Good aspect ratio match
+                      </>
                     ) : ratioMatch < 0.3 ? (
-                      <><AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Slight stretch — consider adjusting</>
+                      <>
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Slight stretch — consider
+                        adjusting
+                      </>
                     ) : (
-                      <><AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Image will be stretched significantly</>
+                      <>
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Image will be stretched
+                        significantly
+                      </>
                     )}
                   </div>
                 )}
@@ -218,7 +265,12 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
             )}
 
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => fileRef.current?.click()}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => fileRef.current?.click()}
+              >
                 Change
               </Button>
               <Button variant="outline" size="sm" className="flex-1" onClick={handleRemoveImage}>
@@ -227,20 +279,115 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
             </div>
           </div>
         ) : (
-          <Button variant="outline" className="w-full gap-2" size="sm" onClick={() => fileRef.current?.click()}>
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
+          >
             <ImageIcon className="w-4 h-4" />
             Select Image
           </Button>
         )}
       </div>
 
+      {/* Link input */}
+      <div className="p-4 space-y-2 border-b border-border">
+        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+          Link (optional)
+        </p>
+        <input
+          type="url"
+          placeholder="https://..."
+          value={linkValue}
+          onChange={(e) => setLinkValue(e.target.value)}
+          className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+
       {/* Buy button */}
       <div className="p-4 mt-auto">
-        <Button onClick={handleBuy} className="w-full gap-2" size="sm" disabled={!selection}>
-          <ShoppingCart className="w-4 h-4" />
-          {pendingFile ? "Buy & Place Image" : "Buy Region"}
+        <Button
+          onClick={handleBuy}
+          className="w-full gap-2"
+          size="sm"
+          disabled={!selection || isPurchasing}
+        >
+          {isPurchasing ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <ShoppingCart className="w-4 h-4" />
+              {pendingFile ? "Buy & Place Image" : "Buy Region"}
+            </>
+          )}
         </Button>
       </div>
+    </div>
+  );
+};
+
+const PricingBreakdown = ({ selection }: { selection: Selection }) => {
+  const { centerCount, curveCount } = countCenterAndCurveBlocks(
+    selection.col,
+    selection.row,
+    selection.width,
+    selection.height
+  );
+  const centerPrice = formatUsdc(centerCount * CENTER_PRICE_PER_BLOCK);
+  const curveStartDisplay = (Number(CURVE_START_PRICE) / 10 ** USDC_DECIMALS).toFixed(2);
+  const curveEndDisplay = (Number(CURVE_END_PRICE) / 10 ** USDC_DECIMALS).toFixed(2);
+  const centerPriceDisplay = (Number(CENTER_PRICE_PER_BLOCK) / 10 ** USDC_DECIMALS).toFixed(2);
+
+  return (
+    <div className="rounded-md bg-muted/50 border border-border p-2.5 space-y-2 text-xs">
+      <p className="font-semibold text-foreground text-[11px] uppercase tracking-wider">How pricing works</p>
+
+      {/* Center zone */}
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-sm bg-amber-400/80 shrink-0" />
+          <span className="text-muted-foreground">Center zone</span>
+          <span className="ml-auto text-foreground font-mono">{centerPriceDisplay} USDC/block</span>
+        </div>
+        <p className="text-muted-foreground/70 text-[10px] pl-3.5">
+          60x34 premium area — fixed price
+        </p>
+      </div>
+
+      {/* Bonding curve */}
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-sm bg-primary/80 shrink-0" />
+          <span className="text-muted-foreground">Outer zone</span>
+          <span className="ml-auto text-foreground font-mono">{curveStartDisplay}–{curveEndDisplay}</span>
+        </div>
+        <p className="text-muted-foreground/70 text-[10px] pl-3.5">
+          Linear bonding curve — price rises as more blocks are sold
+        </p>
+      </div>
+
+      {/* Selection breakdown */}
+      {(centerCount > 0n || curveCount > 0n) && (
+        <div className="border-t border-border pt-1.5 space-y-0.5">
+          <p className="text-muted-foreground/70 text-[10px] uppercase tracking-wider">Your selection</p>
+          {centerCount > 0n && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>{centerCount.toString()} center block{centerCount > 1n ? "s" : ""}</span>
+              <span className="text-foreground font-mono">{centerPrice} USDC</span>
+            </div>
+          )}
+          {curveCount > 0n && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>{curveCount.toString()} outer block{curveCount > 1n ? "s" : ""}</span>
+              <span className="text-foreground font-mono">bonding curve</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -32,6 +32,7 @@ pub struct UpdateRegion<'info> {
 
     /// The collection account
     /// CHECK: Validated in handler against canvas_state.collection
+    #[account(mut)]
     pub collection: AccountInfo<'info>,
 
     /// CHECK: Metaplex Core program

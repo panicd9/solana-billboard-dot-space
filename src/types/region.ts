@@ -1,29 +1,30 @@
+export interface ListingInfo {
+  seller: string;
+  startPrice: bigint;
+  endPrice: bigint;
+  startTime: bigint;
+  endTime: bigint;
+}
+
 export interface Region {
-  id: string;
+  id: string; // asset address (base58)
   startX: number;
   startY: number;
   width: number;
   height: number;
   owner: string;
-  imageUrl: string;
+  imageUrl: string; // IPFS gateway URL for display
+  imageUri: string; // on-chain URI (ipfs://...)
   linkUrl: string;
-  purchasePrice: number;
+  purchasePrice: number; // USDC (display value)
   isListed: boolean;
-  listingPrice?: number;
+  listing: ListingInfo | null;
   createdAt: number;
-  // Premium features
+  boostFlags: number;
   isHighlighted: boolean;
-  highlightExpiresAt?: number;
   hasGlowBorder: boolean;
-  glowExpiresAt?: number;
   isTrending: boolean;
-  trendingExpiresAt?: number;
 }
-
-export const HIGHLIGHT_COST = 0.05;
-export const GLOW_COST = 0.08;
-export const TRENDING_COST = 0.15;
-export const PREMIUM_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface Selection {
   col: number;
@@ -37,4 +38,8 @@ export const GRID_ROWS = 108;
 export const BLOCK_SIZE = 10;
 export const CANVAS_W = GRID_COLS * BLOCK_SIZE;
 export const CANVAS_H = GRID_ROWS * BLOCK_SIZE;
-export const PRICE_PER_BLOCK = 0.01;
+
+// Boost costs in USDC (display values)
+export const HIGHLIGHT_COST_USDC = 1.0;
+export const GLOW_COST_USDC = 2.0;
+export const TRENDING_COST_USDC = 5.0;

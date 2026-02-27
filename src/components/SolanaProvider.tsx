@@ -1,27 +1,27 @@
 import { FC, ReactNode, useMemo } from "react";
-import {
-  ConnectionProvider,
-  WalletProvider,
-} from "@solana/wallet-adapter-react";
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
-import { clusterApiUrl } from "@solana/web3.js";
-import "@solana/wallet-adapter-react-ui/styles.css";
+import { SolanaProvider as BaseSolanaProvider } from "@solana/react-hooks";
+import { createClient, autoDiscover } from "@solana/client";
+import { config } from "@/config/env";
 
 interface Props {
   children: ReactNode;
 }
 
 const SolanaProvider: FC<Props> = ({ children }) => {
-  const endpoint = useMemo(() => clusterApiUrl("devnet"), []);
-  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+  const client = useMemo(
+    () =>
+      createClient({
+        endpoint: config.rpcUrl,
+        websocketEndpoint: config.wsUrl,
+        walletConnectors: autoDiscover(),
+      }),
+    []
+  );
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <BaseSolanaProvider client={client} walletPersistence={{ autoConnect: true }}>
+      {children}
+    </BaseSolanaProvider>
   );
 };
 

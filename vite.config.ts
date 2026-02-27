@@ -14,11 +14,12 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      { find: "@/generated", replacement: path.resolve(__dirname, "./solana-space/clients/js/src/generated") },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
   define: {
-    global: "globalThis",
+    "process.env.NODE_ENV": JSON.stringify(mode),
   },
 }));

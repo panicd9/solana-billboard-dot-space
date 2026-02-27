@@ -1,25 +1,56 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { Region, Selection, GRID_COLS, GRID_ROWS, PRICE_PER_BLOCK, PREMIUM_DURATION } from "@/types/region";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { GRID_COLS, GRID_ROWS, type Region, type Selection } from "@/types/region";
+import { useCanvasState } from "@/hooks/useCanvasState";
+import { useOnChainRegions } from "@/hooks/useOnChainRegions";
+import {
+  useMintRegion,
+  useUpdateRegionImage,
+  useUpdateRegionLink,
+  useCreateListing,
+  useCancelListing,
+  useExecutePurchase,
+  useBuyBoost,
+} from "@/hooks/useProgramTransactions";
+import { calculateRegionPrice, formatUsdc } from "@/solana/pricing";
+import { uploadToIpfs } from "@/solana/ipfs";
 
 interface RegionContextType {
   regions: Region[];
-  occupancy: Map<string, string>; // "x:y" -> regionId
+  occupancy: Set<string>; // "x:y"
   selectedRegion: Region | null;
   setSelectedRegion: (r: Region | null) => void;
   isOccupied: (col: number, row: number) => boolean;
   getRegionAt: (col: number, row: number) => Region | undefined;
   hasOverlap: (sel: Selection) => boolean;
-  purchaseRegion: (sel: Selection) => Region;
-  setRegionImage: (regionId: string, imageUrl: string) => void;
-  setRegionLink: (regionId: string, linkUrl: string) => void;
-  listRegion: (regionId: string, price: number) => void;
-  unlistRegion: (regionId: string) => void;
-  buyListedRegion: (regionId: string, buyerAddress: string) => void;
-  highlightRegion: (regionId: string) => void;
-  glowRegion: (regionId: string) => void;
-  trendRegion: (regionId: string) => void;
+  purchaseRegion: (sel: Selection, imageFile: File | null, link: string) => Promise<Region>;
+  setRegionImage: (assetAddress: string, imageFile: File) => Promise<void>;
+  setRegionLink: (assetAddress: string, link: string) => Promise<void>;
+  listRegion: (
+    assetAddress: string,
+    startPrice: bigint,
+    endPrice: bigint,
+    durationSeconds: bigint
+  ) => Promise<void>;
+  unlistRegion: (assetAddress: string) => Promise<void>;
+  buyListedRegion: (
+    assetAddress: string,
+    sellerAddress: string,
+    sellerUsdcAta: string
+  ) => Promise<void>;
+  buyBoost: (assetAddress: string, boostFlags: number) => Promise<void>;
+  calculatePrice: (sel: Selection) => { lamports: bigint; display: string };
   trendingRegions: Region[];
   loadedImages: Map<string, HTMLImageElement>;
+  isLoading: boolean;
+  error: Error | null;
 }
 
 const RegionContext = createContext<RegionContextType | null>(null);
@@ -30,31 +61,115 @@ export const useRegions = () => {
   return ctx;
 };
 
-function generateId() {
-  return Math.random().toString(36).substring(2, 10);
-}
-
-function generateMockAddress() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789";
-  let addr = "";
-  for (let i = 0; i < 44; i++) addr += chars[Math.floor(Math.random() * chars.length)];
-  return addr;
-}
-
 export const RegionProvider = ({ children }: { children: ReactNode }) => {
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [occupancy, setOccupancy] = useState<Map<string, string>>(new Map());
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
 
-  const isOccupied = useCallback((col: number, row: number) => occupancy.has(`${col}:${row}`), [occupancy]);
+  // On-chain data hooks
+  const canvasState = useCanvasState();
+  const regionsQuery = useOnChainRegions();
+
+  // Transaction mutations
+  const mintMutation = useMintRegion();
+  const updateImageMutation = useUpdateRegionImage();
+  const updateLinkMutation = useUpdateRegionLink();
+  const createListingMutation = useCreateListing();
+  const cancelListingMutation = useCancelListing();
+  const executePurchaseMutation = useExecutePurchase();
+  const buyBoostMutation = useBuyBoost();
+
+  const regions = useMemo(() => regionsQuery.data ?? [], [regionsQuery.data]);
+  const occupancy = useMemo(
+    () => canvasState.data?.occupiedBlocks ?? new Set<string>(),
+    [canvasState.data?.occupiedBlocks]
+  );
+
+  // Preload images for canvas rendering
+  useEffect(() => {
+    for (const region of regions) {
+      if (region.imageUrl && !loadedImages.has(region.id)) {
+        const img = new Image();
+        img.onload = () => {
+          setLoadedImages((prev) => {
+            const next = new Map(prev);
+            next.set(region.id, img);
+            return next;
+          });
+        };
+        img.src = region.imageUrl;
+      }
+    }
+  }, [regions, loadedImages]);
+
+  const isOccupied = useCallback(
+    (col: number, row: number) => occupancy.has(`${col}:${row}`),
+    [occupancy]
+  );
 
   const getRegionAt = useCallback(
-    (col: number, row: number) => {
-      const id = occupancy.get(`${col}:${row}`);
-      return id ? regions.find((r) => r.id === id) : undefined;
+    (col: number, row: number): Region | undefined => {
+      // First try to find a fully-loaded region whose bounds contain this grid cell
+      const found = regions.find(
+        (r) =>
+          col >= r.startX &&
+          col < r.startX + r.width &&
+          row >= r.startY &&
+          row < r.startY + r.height
+      );
+      if (found) return found;
+
+      // Fallback: if bitmap says occupied but no Region object loaded,
+      // reconstruct region bounds by scanning connected occupied blocks
+      if (!occupancy.has(`${col}:${row}`)) return undefined;
+
+      // Expand outward from clicked block to find the rectangular extent
+      let minX = col, maxX = col, minY = row, maxY = row;
+      // Expand left
+      while (minX > 0 && occupancy.has(`${minX - 1}:${row}`)) minX--;
+      // Expand right
+      while (maxX < GRID_COLS - 1 && occupancy.has(`${maxX + 1}:${row}`)) maxX++;
+      // Expand up — only keep rows where the full width is occupied
+      while (minY > 0) {
+        let fullRow = true;
+        for (let x = minX; x <= maxX; x++) {
+          if (!occupancy.has(`${x}:${minY - 1}`)) { fullRow = false; break; }
+        }
+        if (!fullRow) break;
+        minY--;
+      }
+      // Expand down
+      while (maxY < GRID_ROWS - 1) {
+        let fullRow = true;
+        for (let x = minX; x <= maxX; x++) {
+          if (!occupancy.has(`${x}:${maxY + 1}`)) { fullRow = false; break; }
+        }
+        if (!fullRow) break;
+        maxY++;
+      }
+
+      const w = maxX - minX + 1;
+      const h = maxY - minY + 1;
+      return {
+        id: `bitmap-${minX}-${minY}-${w}-${h}`,
+        startX: minX,
+        startY: minY,
+        width: w,
+        height: h,
+        owner: "",
+        imageUrl: "",
+        imageUri: "",
+        linkUrl: "",
+        purchasePrice: 0,
+        isListed: false,
+        listing: null,
+        createdAt: 0,
+        boostFlags: 0,
+        isHighlighted: false,
+        hasGlowBorder: false,
+        isTrending: false,
+      };
     },
-    [occupancy, regions]
+    [regions, occupancy]
   );
 
   const hasOverlap = useCallback(
@@ -69,100 +184,119 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
     [occupancy]
   );
 
+  const calculatePrice = useCallback(
+    (sel: Selection) => {
+      const curveBlocksSold = canvasState.data?.curveBlocksSold ?? 0;
+      const lamports = calculateRegionPrice(
+        sel.col,
+        sel.row,
+        sel.width,
+        sel.height,
+        curveBlocksSold
+      );
+      return { lamports, display: formatUsdc(lamports) };
+    },
+    [canvasState.data?.curveBlocksSold]
+  );
+
   const purchaseRegion = useCallback(
-    (sel: Selection): Region => {
-      const id = generateId();
-      const totalBlocks = sel.width * sel.height;
-      const region: Region = {
-        id,
+    async (sel: Selection, imageFile: File | null, link: string): Promise<Region> => {
+      const result = await mintMutation.mutateAsync({
+        x: sel.col,
+        y: sel.row,
+        width: sel.width,
+        height: sel.height,
+        imageFile,
+        link,
+      });
+
+      // Return a provisional Region object while the query refetches
+      return {
+        id: result.assetAddress as string,
         startX: sel.col,
         startY: sel.row,
         width: sel.width,
         height: sel.height,
-        owner: generateMockAddress(),
+        owner: "",
         imageUrl: "",
-        linkUrl: "",
-        purchasePrice: totalBlocks * PRICE_PER_BLOCK,
+        imageUri: "",
+        linkUrl: link,
+        purchasePrice: 0,
         isListed: false,
+        listing: null,
         createdAt: Date.now(),
+        boostFlags: 0,
         isHighlighted: false,
         hasGlowBorder: false,
         isTrending: false,
       };
-      setRegions((prev) => [...prev, region]);
-      setOccupancy((prev) => {
-        const next = new Map(prev);
-        for (let r = sel.row; r < sel.row + sel.height; r++) {
-          for (let c = sel.col; c < sel.col + sel.width; c++) {
-            next.set(`${c}:${r}`, id);
-          }
-        }
-        return next;
-      });
-      return region;
     },
-    []
+    [mintMutation]
   );
 
-  const setRegionImage = useCallback((regionId: string, imageUrl: string) => {
-    setRegions((prev) => prev.map((r) => (r.id === regionId ? { ...r, imageUrl } : r)));
-    // Preload image
-    const img = new Image();
-    img.onload = () => {
-      setLoadedImages((prev) => {
-        const next = new Map(prev);
-        next.set(regionId, img);
-        return next;
+  const setRegionImage = useCallback(
+    async (assetAddress: string, imageFile: File) => {
+      await updateImageMutation.mutateAsync({ assetAddress, imageFile });
+    },
+    [updateImageMutation]
+  );
+
+  const setRegionLink = useCallback(
+    async (assetAddress: string, link: string) => {
+      await updateLinkMutation.mutateAsync({ assetAddress, link });
+    },
+    [updateLinkMutation]
+  );
+
+  const listRegion = useCallback(
+    async (
+      assetAddress: string,
+      startPrice: bigint,
+      endPrice: bigint,
+      durationSeconds: bigint
+    ) => {
+      await createListingMutation.mutateAsync({
+        assetAddress,
+        startPrice,
+        endPrice,
+        durationSeconds,
       });
-    };
-    img.src = imageUrl;
-  }, []);
+    },
+    [createListingMutation]
+  );
 
-  const setRegionLink = useCallback((regionId: string, linkUrl: string) => {
-    setRegions((prev) => prev.map((r) => (r.id === regionId ? { ...r, linkUrl } : r)));
-  }, []);
+  const unlistRegion = useCallback(
+    async (assetAddress: string) => {
+      await cancelListingMutation.mutateAsync(assetAddress);
+    },
+    [cancelListingMutation]
+  );
 
-  const listRegion = useCallback((regionId: string, price: number) => {
-    setRegions((prev) => prev.map((r) => (r.id === regionId ? { ...r, isListed: true, listingPrice: price } : r)));
-  }, []);
+  const buyListedRegion = useCallback(
+    async (assetAddress: string, sellerAddress: string, sellerUsdcAta: string) => {
+      await executePurchaseMutation.mutateAsync({
+        sellerAddress,
+        assetAddress,
+        sellerUsdcAta,
+      });
+    },
+    [executePurchaseMutation]
+  );
 
-  const unlistRegion = useCallback((regionId: string) => {
-    setRegions((prev) => prev.map((r) => (r.id === regionId ? { ...r, isListed: false, listingPrice: undefined } : r)));
-  }, []);
+  const buyBoost = useCallback(
+    async (assetAddress: string, boostFlags: number) => {
+      await buyBoostMutation.mutateAsync({ assetAddress, boostFlags });
+    },
+    [buyBoostMutation]
+  );
 
-  const buyListedRegion = useCallback((regionId: string, buyerAddress: string) => {
-    setRegions((prev) =>
-      prev.map((r) =>
-        r.id === regionId ? { ...r, owner: buyerAddress, isListed: false, listingPrice: undefined } : r
-      )
-    );
-  }, []);
+  const trendingRegions = useMemo(
+    () => regions.filter((r) => r.isTrending),
+    [regions]
+  );
 
-  const highlightRegion = useCallback((regionId: string) => {
-    setRegions((prev) =>
-      prev.map((r) =>
-        r.id === regionId ? { ...r, isHighlighted: true, highlightExpiresAt: Date.now() + PREMIUM_DURATION } : r
-      )
-    );
-  }, []);
-
-  const glowRegion = useCallback((regionId: string) => {
-    setRegions((prev) =>
-      prev.map((r) =>
-        r.id === regionId ? { ...r, hasGlowBorder: true, glowExpiresAt: Date.now() + PREMIUM_DURATION } : r
-      )
-    );
-  }, []);
-
-  const trendRegion = useCallback((regionId: string) => {
-    setRegions((prev) =>
-      prev.map((r) =>
-        r.id === regionId ? { ...r, isTrending: true, trendingExpiresAt: Date.now() + PREMIUM_DURATION } : r
-      )
-    );
-  }, []);
-
-  const trendingRegions = regions.filter((r) => r.isTrending && (!r.trendingExpiresAt || r.trendingExpiresAt > Date.now()));
+  const isLoading = canvasState.isLoading || regionsQuery.isLoading;
+  const error = (canvasState.error ?? regionsQuery.error) as Error | null;
 
   return (
     <RegionContext.Provider
@@ -180,11 +314,12 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         listRegion,
         unlistRegion,
         buyListedRegion,
-        highlightRegion,
-        glowRegion,
-        trendRegion,
+        buyBoost,
+        calculatePrice,
         trendingRegions,
         loadedImages,
+        isLoading,
+        error,
       }}
     >
       {children}

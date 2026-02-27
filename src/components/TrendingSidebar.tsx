@@ -1,8 +1,10 @@
 import { useRegions } from "@/context/RegionContext";
 import { TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import type { Region } from "@/types/region";
 
 interface Props {
-  onSelectRegion: (regionId: string) => void;
+  onSelectRegion: (region: Region) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -43,7 +45,7 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
           {trendingRegions.map((r) => (
             <button
               key={r.id}
-              onClick={() => onSelectRegion(r.id)}
+              onClick={() => onSelectRegion(r)}
               className="w-full text-left p-3 border-b border-border hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center gap-2">
@@ -59,10 +61,20 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
                     {r.owner.slice(0, 4)}...{r.owner.slice(-4)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {r.width}×{r.height} · ({r.startX},{r.startY})
+                    {r.width}x{r.height} · ({r.startX},{r.startY})
                   </p>
-                  {r.isListed && (
-                    <p className="text-xs text-accent font-semibold">{r.listingPrice} SOL</p>
+                  {r.isListed && r.listing && (
+                    <p className="text-xs text-accent font-semibold">
+                      {formatUsdc(
+                        calculateListingCurrentPrice(
+                          r.listing.startPrice,
+                          r.listing.endPrice,
+                          r.listing.startTime,
+                          r.listing.endTime
+                        )
+                      )}{" "}
+                      USDC
+                    </p>
                   )}
                 </div>
               </div>

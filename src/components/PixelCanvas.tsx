@@ -1,18 +1,20 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react";
-import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, Selection } from "@/types/region";
+import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, type Selection, type Region } from "@/types/region";
+import { CENTER_ZONE_X, CENTER_ZONE_Y, CENTER_ZONE_WIDTH, CENTER_ZONE_HEIGHT } from "@/solana/constants";
 import { useRegions } from "@/context/RegionContext";
 import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
 
 interface Props {
   selection: Selection | null;
   onSelectionChange: (sel: Selection | null) => void;
-  onRegionClick: (regionId: string) => void;
+  onRegionClick: (region: Region) => void;
+  showPricingOverlay?: boolean;
 }
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
 
-const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props) => {
+const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages } = useRegions();
@@ -32,7 +34,6 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
   const clampPan = useCallback((px: number, py: number, z: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: px, y: py };
-    // Pan operates in canvas logical coordinates, use canvas.width not rect.width
     const minX = Math.min(0, canvas.width - CANVAS_W * z);
     const minY = Math.min(0, canvas.height - CANVAS_H * z);
     return {
@@ -72,7 +73,6 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      // Middle click or space+click for panning
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
         e.preventDefault();
         setIsPanning(true);
@@ -85,7 +85,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
 
       const region = getRegionAt(coords.col, coords.row);
       if (region) {
-        onRegionClick(region.id);
+        onRegionClick(region);
         return;
       }
 
@@ -117,7 +117,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         setTooltipInfo({
           x: e.clientX - rect.left,
           y: e.clientY - rect.top,
-          text: `${region.owner.slice(0, 4)}...${region.owner.slice(-4)} | ${region.width}×${region.height}`,
+          text: `${region.owner.slice(0, 4)}...${region.owner.slice(-4)} | ${region.width}x${region.height}`,
         });
       } else {
         setTooltipInfo(null);
@@ -127,7 +127,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         setDragEnd(coords);
       }
     },
-    [getBlockCoords, isDragging, dragStart, getRegionAt, isPanning]
+    [getBlockCoords, isDragging, dragStart, getRegionAt, isPanning, clampPan, zoom]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -168,14 +168,13 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * zoomFactor));
 
-    // Zoom towards mouse position
     const scale = newZoom / zoom;
     const newPanX = mouseX - scale * (mouseX - pan.x);
     const newPanY = mouseY - scale * (mouseY - pan.y);
 
     setZoom(newZoom);
     setPan(clampPan(newPanX, newPanY, newZoom));
-  }, [zoom, pan]);
+  }, [zoom, pan, clampPan]);
 
   const resetView = useCallback(() => {
     setZoom(1);
@@ -222,6 +221,65 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         ctx.stroke();
       }
 
+      // Center zone pricing overlay
+      if (showPricingOverlay) {
+        const czX = CENTER_ZONE_X * BLOCK_SIZE;
+        const czY = CENTER_ZONE_Y * BLOCK_SIZE;
+        const czW = CENTER_ZONE_WIDTH * BLOCK_SIZE;
+        const czH = CENTER_ZONE_HEIGHT * BLOCK_SIZE;
+
+        // Dim the outer zone
+        ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+        ctx.fillRect(0, 0, CANVAS_W, czY); // top
+        ctx.fillRect(0, czY, czX, czH); // left
+        ctx.fillRect(czX + czW, czY, CANVAS_W - czX - czW, czH); // right
+        ctx.fillRect(0, czY + czH, CANVAS_W, CANVAS_H - czY - czH); // bottom
+
+        // Highlight center zone
+        ctx.fillStyle = "rgba(255, 200, 55, 0.10)";
+        ctx.fillRect(czX, czY, czW, czH);
+        ctx.strokeStyle = "rgba(255, 200, 55, 0.6)";
+        ctx.lineWidth = 2 / zoom;
+        ctx.setLineDash([6 / zoom, 4 / zoom]);
+        ctx.strokeRect(czX, czY, czW, czH);
+        ctx.setLineDash([]);
+
+        // Label
+        const label = "Center Zone — 0.12 USDC/block";
+        const fontSize = 18 / zoom;
+        ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
+        const tm = ctx.measureText(label);
+        const lx = czX + czW / 2 - tm.width / 2;
+        const ly = czY - 10 / zoom;
+        ctx.fillStyle = "rgba(14, 14, 17, 0.85)";
+        ctx.fillRect(lx - 8 / zoom, ly - fontSize - 3 / zoom, tm.width + 16 / zoom, fontSize + 8 / zoom);
+        ctx.fillStyle = "rgba(255, 200, 55, 0.95)";
+        ctx.fillText(label, lx, ly);
+
+        // Outer zone label
+        const outerLabel = "Outer Zone — bonding curve 0.01–0.10 USDC";
+        const outerFontSize = 16 / zoom;
+        ctx.font = `bold ${outerFontSize}px 'Space Grotesk', sans-serif`;
+        const otm = ctx.measureText(outerLabel);
+        const olx = 12 / zoom;
+        const oly = 26 / zoom;
+        ctx.fillStyle = "rgba(14, 14, 17, 0.85)";
+        ctx.fillRect(olx - 6 / zoom, oly - outerFontSize - 2 / zoom, otm.width + 12 / zoom, outerFontSize + 8 / zoom);
+        ctx.fillStyle = "rgba(0, 210, 190, 0.9)";
+        ctx.fillText(outerLabel, olx, oly);
+      }
+
+      // Render occupied blocks from bitmap (visible even if region objects didn't load)
+      if (occupancy.size > 0) {
+        ctx.fillStyle = "rgba(100, 70, 180, 0.3)";
+        for (const key of occupancy) {
+          const sep = key.indexOf(":");
+          const bx = parseInt(key.slice(0, sep), 10);
+          const by = parseInt(key.slice(sep + 1), 10);
+          ctx.fillRect(bx * BLOCK_SIZE, by * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        }
+      }
+
       // Render regions
       const now = Date.now();
       for (const region of regions) {
@@ -234,16 +292,49 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         if (img) {
           ctx.drawImage(img, rx, ry, rw, rh);
         } else {
-          ctx.fillStyle = "rgba(100, 70, 180, 0.15)";
+          // Solid fill for claimed regions without an image
+          ctx.fillStyle = "rgba(100, 70, 180, 0.25)";
           ctx.fillRect(rx, ry, rw, rh);
+
+          // Diagonal hatching pattern to make them clearly "taken"
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(rx, ry, rw, rh);
+          ctx.clip();
+          ctx.strokeStyle = "rgba(100, 70, 180, 0.18)";
+          ctx.lineWidth = 1 / zoom;
+          const step = 8;
+          for (let d = -rh; d < rw; d += step) {
+            ctx.beginPath();
+            ctx.moveTo(rx + d, ry);
+            ctx.lineTo(rx + d + rh, ry + rh);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          // Owner label centered in region
+          const label = `${region.owner.slice(0, 4)}..${region.owner.slice(-4)}`;
+          const fontSize = Math.min(20, Math.min(rw, rh) * 0.6);
+          if (fontSize >= 4) {
+            ctx.font = `${fontSize / zoom}px 'JetBrains Mono', monospace`;
+            const tm = ctx.measureText(label);
+            const lx = rx + rw / 2 - tm.width / 2;
+            const ly = ry + rh / 2 + fontSize / zoom / 3;
+            ctx.fillStyle = "rgba(14, 14, 17, 0.7)";
+            ctx.fillRect(lx - 2 / zoom, ly - fontSize / zoom - 1 / zoom, tm.width + 4 / zoom, fontSize / zoom + 4 / zoom);
+            ctx.fillStyle = "rgba(160, 130, 220, 0.9)";
+            ctx.fillText(label, lx, ly);
+          }
         }
 
-        if (region.isHighlighted && (!region.highlightExpiresAt || region.highlightExpiresAt > now)) {
+        // Highlight boost (permanent on-chain)
+        if (region.isHighlighted) {
           ctx.fillStyle = "rgba(255, 215, 0, 0.12)";
           ctx.fillRect(rx, ry, rw, rh);
         }
 
-        if (region.hasGlowBorder && (!region.glowExpiresAt || region.glowExpiresAt > now)) {
+        // Glow boost (permanent on-chain)
+        if (region.hasGlowBorder) {
           const pulse = 0.5 + 0.5 * Math.sin(now / 300);
           ctx.shadowColor = `rgba(0, 210, 255, ${0.4 + pulse * 0.6})`;
           ctx.shadowBlur = (8 + pulse * 8) / zoom;
@@ -253,12 +344,13 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
           ctx.shadowColor = "transparent";
           ctx.shadowBlur = 0;
         } else {
-          ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.6)" : "rgba(100, 70, 180, 0.4)";
-          ctx.lineWidth = 1 / zoom;
+          ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.7)" : "rgba(100, 70, 180, 0.6)";
+          ctx.lineWidth = 1.5 / zoom;
           ctx.strokeRect(rx, ry, rw, rh);
         }
 
-        if (region.isTrending && (!region.trendingExpiresAt || region.trendingExpiresAt > now)) {
+        // Trending indicator (permanent on-chain)
+        if (region.isTrending) {
           ctx.fillStyle = "rgba(255, 140, 0, 0.9)";
           ctx.fillRect(rx, ry, 6, 6);
         }
@@ -293,13 +385,14 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
         ctx.lineWidth = 2 / zoom;
         ctx.strokeRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
 
-        const text = `${sel.width}×${sel.height} (${sel.width * sel.height})`;
-        ctx.font = `bold ${11 / zoom}px 'Space Grotesk', sans-serif`;
+        const text = `${sel.width}x${sel.height} (${sel.width * sel.height})`;
+        const labelSize = 14 / zoom;
+        ctx.font = `bold ${labelSize}px 'Space Grotesk', sans-serif`;
         const metrics = ctx.measureText(text);
         const lx = sel.col * BLOCK_SIZE + (sel.width * BLOCK_SIZE) / 2 - metrics.width / 2;
-        const ly = sel.row * BLOCK_SIZE - 6 / zoom;
+        const ly = sel.row * BLOCK_SIZE - 8 / zoom;
         ctx.fillStyle = "rgba(14, 14, 17, 0.9)";
-        ctx.fillRect(lx - 4 / zoom, ly - 11 / zoom, metrics.width + 8 / zoom, 16 / zoom);
+        ctx.fillRect(lx - 5 / zoom, ly - labelSize - 2 / zoom, metrics.width + 10 / zoom, labelSize + 8 / zoom);
         ctx.fillStyle = overlap ? "#dc3232" : "#00E0FF";
         ctx.fillText(text, lx, ly);
       }
@@ -320,7 +413,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick }: Props
 
     animRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animRef.current);
-  }, [regions, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd, selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan]);
+  }, [regions, occupancy, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd, selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan, showPricingOverlay]);
 
   return (
     <div ref={containerRef} className="relative flex-1 overflow-hidden flex items-center justify-center bg-background p-2">

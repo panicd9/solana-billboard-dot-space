@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { ArrowUpDown, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRegions } from "@/context/RegionContext";
+import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
 
 interface Props {
   onHighlightRegion: (regionId: string) => void;
@@ -53,52 +54,64 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sorted.map((r) => (
-              <div
-                key={r.id}
-                className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 transition-colors cursor-pointer group"
-                onClick={() => {
-                  setSelectedRegion(r);
-                  onHighlightRegion(r.id);
-                }}
-              >
-                {/* Thumbnail */}
-                <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden">
-                  {r.imageUrl ? (
-                    <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="text-muted-foreground text-xs font-mono">No image</div>
-                  )}
+            {sorted.map((r) => {
+              const currentPrice =
+                r.isListed && r.listing
+                  ? formatUsdc(
+                      calculateListingCurrentPrice(
+                        r.listing.startPrice,
+                        r.listing.endPrice,
+                        r.listing.startTime,
+                        r.listing.endTime
+                      )
+                    )
+                  : null;
+
+              return (
+                <div
+                  key={r.id}
+                  className="bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 transition-colors cursor-pointer group"
+                  onClick={() => {
+                    setSelectedRegion(r);
+                    onHighlightRegion(r.id);
+                  }}
+                >
+                  <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden">
+                    {r.imageUrl ? (
+                      <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-muted-foreground text-xs font-mono">No image</div>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-1.5 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Owner</span>
+                      <span className="text-foreground">
+                        {r.owner.slice(0, 4)}...{r.owner.slice(-4)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Position</span>
+                      <span className="text-foreground flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />({r.startX},{r.startY})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Size</span>
+                      <span className="text-primary">
+                        {r.width}x{r.height} ({r.width * r.height})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
+                        {currentPrice ? `Listed @ ${currentPrice} USDC` : "Unlisted"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-3 space-y-1.5 text-xs font-mono">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Owner</span>
-                    <span className="text-foreground">{r.owner.slice(0, 4)}...{r.owner.slice(-4)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Position</span>
-                    <span className="text-foreground flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      ({r.startX},{r.startY})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Size</span>
-                    <span className="text-primary">{r.width}×{r.height} ({r.width * r.height})</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Price</span>
-                    <span className="text-accent">{r.purchasePrice.toFixed(4)} SOL</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status</span>
-                    <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
-                      {r.isListed ? `Listed @ ${r.listingPrice} SOL` : "Unlisted"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
