@@ -1,73 +1,155 @@
-# Welcome to your Lovable project
+# Pixel Canvas Studio
 
-## Project info
+A Solana-powered pixel marketplace where users purchase rectangular grid regions on a shared 1920x1080 canvas, upload images, trade regions via Dutch auctions, and boost visibility — all backed by on-chain NFTs.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## How It Works
 
-## How can I edit this code?
+The canvas is a 192x108 grid of 10px blocks. Users select a rectangular area, pay with USDC, and receive a Metaplex Core NFT representing ownership. Owners can upload images, set external links, list regions for sale on the marketplace, or purchase boosts (highlight, glow, trending) to increase visibility.
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui |
+| Solana Client | @solana/kit, @solana/react-hooks, @solana/client |
+| Smart Contract | Rust, Anchor 0.31, Metaplex Core |
+| Payments | USDC (SPL Token) |
+| Storage | IPFS via Pinata |
+| Testing | Vitest |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Project Structure
 
-Changes made via Lovable will be committed automatically to this repo.
+```
+pixel-canvas-studio/
+├── src/
+│   ├── components/        # React components (PixelCanvas, MarketplaceView, etc.)
+│   ├── context/           # RegionContext — central state management
+│   ├── hooks/             # useOnChainRegions, useProgramTransactions, useCanvasState
+│   ├── solana/            # RPC helpers, PDA derivation, pricing, transactions
+│   ├── config/            # Environment configuration
+│   └── types/             # TypeScript types
+├── solana-space/
+│   ├── programs/solana-space/src/   # Anchor program (Rust)
+│   ├── clients/js/src/generated/    # Codama-generated TypeScript client
+│   └── scripts/                     # Setup & initialization scripts
+└── .env.example           # Required environment variables
+```
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Prerequisites
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Node.js 18+
+- Rust & Cargo
+- Solana CLI
+- Anchor CLI 0.31+
+- A Phantom wallet (or any Solana wallet)
 
-Follow these steps:
+### 1. Install Dependencies
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. Configure Environment
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+cp .env.example .env
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Edit `.env` with your values:
+
+```env
+VITE_SOLANA_NETWORK=devnet
+VITE_RPC_URL=                              # Optional, defaults based on network
+VITE_PROGRAM_ID=DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2
+VITE_USDC_MINT=Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr
+VITE_COLLECTION_ADDRESS=                   # From setup script output
+VITE_TREASURY_USDC_ATA=                    # From setup script output
+VITE_PINATA_JWT=                           # Your Pinata API key
+VITE_PINATA_GATEWAY=                       # Your Pinata gateway domain
+```
+
+### 3. Deploy the Program (Devnet)
+
+```bash
+# Build the Anchor program
+cd solana-space && anchor build && cd ..
+
+# Run the devnet setup (airdrops SOL, creates treasury ATA, initializes program)
+npx tsx solana-space/scripts/setup-usdc-dev.ts --devnet
+```
+
+The script outputs `VITE_COLLECTION_ADDRESS` and `VITE_TREASURY_USDC_ATA` — add them to your `.env`.
+
+Fund your wallet with devnet USDC via the [Circle Faucet](https://faucet.circle.com/).
+
+### 4. Start Development Server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Open [http://localhost:8080](http://localhost:8080).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Localnet Setup (Alternative)
 
-**Use GitHub Codespaces**
+For local development with [Surfpool](https://github.com/txtx/surfpool):
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+surfpool start
+npx tsx solana-space/scripts/setup-usdc-dev.ts          # defaults to localnet
+npm run dev
+```
 
-## What technologies are used for this project?
+The localnet setup clones the USDC-dev mint from devnet and funds wallets automatically.
 
-This project is built with:
+## Commands
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+npm run dev          # Start dev server (port 8080)
+npm run build        # Production build
+npm run build:dev    # Development build
+npm run lint         # ESLint
+npm run test         # Run tests (vitest run)
+npm run test:watch   # Watch mode (vitest)
+```
 
-## How can I deploy this project?
+## Pricing Model
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+**Center zone** (60x34 blocks at canvas center): fixed 0.12 USDC per block.
 
-## Can I connect a custom domain to my Lovable project?
+**Outer zone** (remaining 18,696 blocks): linear bonding curve from 0.01 to 0.10 USDC per block, increasing as more blocks are sold.
 
-Yes, you can!
+**Boosts**: Highlighted (1 USDC), Glowing Border (2 USDC), Trending (5 USDC).
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+**Marketplace fee**: 2.5% on secondary sales.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## On-Chain Program
+
+The Anchor program (`solana-space`) manages all state on-chain:
+
+| Instruction | Description |
+|-------------|-------------|
+| `initialize` | Create CanvasState PDA and Metaplex Core collection |
+| `mint_region` | Purchase blocks and mint region as Core NFT |
+| `update_region_image` | Update the IPFS image URI |
+| `update_region_link` | Update the external link |
+| `create_listing` | List region for sale (Dutch auction) |
+| `cancel_listing` | Remove a marketplace listing |
+| `execute_purchase` | Buy a listed region |
+| `buy_boost` | Activate highlight, glow, or trending boosts |
+
+Program ID: `DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2`
+
+## Architecture
+
+**Provider stack**: `QueryClientProvider` > `SolanaProvider` > `TooltipProvider` > `BrowserRouter`
+
+**Data flow**: On-chain Core assets are fetched via `getProgramAccounts`, listing/boost PDAs are batch-fetched with `getMultipleAccounts`, and all state is exposed through `RegionContext`. Mutations use optimistic updates via React Query with background refetches for consistency.
+
+**Canvas rendering**: HTML5 Canvas 2D with support for drag-to-select, pan, zoom, region image rendering, hover tooltips, and boost visual effects (glow borders, highlights).
+
+## License
+
+MIT
