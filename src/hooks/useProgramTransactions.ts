@@ -164,7 +164,6 @@ export function useExecutePurchase() {
     mutationFn: async (params: {
       sellerAddress: string;
       assetAddress: string;
-      sellerUsdcAta: string;
     }) => {
       if (!signer) throw new Error("Wallet not connected");
 
@@ -172,8 +171,7 @@ export function useExecutePurchase() {
       return tx.executePurchase(
         signer,
         params.sellerAddress,
-        params.assetAddress,
-        params.sellerUsdcAta
+        params.assetAddress
       );
     },
     onSuccess: () => {

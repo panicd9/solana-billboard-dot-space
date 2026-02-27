@@ -61,6 +61,7 @@ const TREASURY_ATA = "4S5XQkjEEjekgBvvaJf7eiaqs6g8GHtkjt2CA9UQPWWE";
 const WALLETS = [
   TREASURY_WALLET,
   "7PWXvQBKnr5L6CZMvR5EgbeaniGNhgRxfAq144Nhn5YH",
+  "8xFV3H1xrtCZrSc5ALDXvDZtbPGThEu9wm3f8ua2RSya",
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────

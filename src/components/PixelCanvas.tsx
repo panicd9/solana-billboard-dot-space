@@ -329,20 +329,95 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
         // Highlight boost (permanent on-chain)
         if (region.isHighlighted) {
-          ctx.fillStyle = "rgba(255, 215, 0, 0.12)";
-          ctx.fillRect(rx, ry, rw, rh);
-        }
+          const hPulse = 0.5 + 0.5 * Math.sin(now / 400);
+          // Inset pulses between 15% and 35% of region size
+          const inset = Math.max(rw, rh) * (0.15 + hPulse * 0.20);
+          const glowAlpha = 0.2 + hPulse * 0.2;
 
-        // Glow boost (permanent on-chain)
-        if (region.hasGlowBorder) {
-          const pulse = 0.5 + 0.5 * Math.sin(now / 300);
-          ctx.shadowColor = `rgba(0, 210, 255, ${0.4 + pulse * 0.6})`;
-          ctx.shadowBlur = (8 + pulse * 8) / zoom;
-          ctx.strokeStyle = `rgba(0, 210, 255, ${0.6 + pulse * 0.4})`;
+          // Color shifts between #4284DB and #29EAC4
+          const r = Math.round(66 + (41 - 66) * hPulse);
+          const g = Math.round(132 + (234 - 132) * hPulse);
+          const b = Math.round(219 + (196 - 219) * hPulse);
+
+          // Pulsing inner shadow — four edge gradients
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(rx, ry, rw, rh);
+          ctx.clip();
+
+          const gTop = ctx.createLinearGradient(rx, ry, rx, ry + inset);
+          gTop.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowAlpha})`);
+          gTop.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          ctx.fillStyle = gTop;
+          ctx.fillRect(rx, ry, rw, inset);
+
+          const gBot = ctx.createLinearGradient(rx, ry + rh, rx, ry + rh - inset);
+          gBot.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowAlpha})`);
+          gBot.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          ctx.fillStyle = gBot;
+          ctx.fillRect(rx, ry + rh - inset, rw, inset);
+
+          const gLeft = ctx.createLinearGradient(rx, ry, rx + inset, ry);
+          gLeft.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowAlpha})`);
+          gLeft.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          ctx.fillStyle = gLeft;
+          ctx.fillRect(rx, ry, inset, rh);
+
+          const gRight = ctx.createLinearGradient(rx + rw, ry, rx + rw - inset, ry);
+          gRight.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowAlpha})`);
+          gRight.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          ctx.fillStyle = gRight;
+          ctx.fillRect(rx + rw - inset, ry, inset, rh);
+
+          ctx.restore();
+
+          // Border stroke with smaller glow
+          ctx.save();
+          ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${0.4 + hPulse * 0.3})`;
+          ctx.shadowBlur = (8 + hPulse * 8) / zoom;
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.7 + hPulse * 0.3})`;
           ctx.lineWidth = 2 / zoom;
           ctx.strokeRect(rx, ry, rw, rh);
-          ctx.shadowColor = "transparent";
-          ctx.shadowBlur = 0;
+          ctx.restore();
+        }
+
+        // Glow boost (permanent on-chain) — rotating snake border
+        if (region.hasGlowBorder) {
+          const perimeter = 2 * (rw + rh);
+          const snakeLen = perimeter * 0.3;
+          const gapLen = perimeter - snakeLen;
+          const speed = now * 0.08;
+          const dashOffset = -(speed % perimeter);
+
+          // Dim base border so the full outline is faintly visible
+          ctx.save();
+          ctx.strokeStyle = "rgba(153, 69, 255, 0.2)";
+          ctx.lineWidth = 2 / zoom;
+          ctx.strokeRect(rx, ry, rw, rh);
+          ctx.restore();
+
+          // Bright snake segment with glow
+          ctx.save();
+          ctx.shadowColor = "rgba(153, 69, 255, 0.9)";
+          ctx.shadowBlur = 14 / zoom;
+          ctx.strokeStyle = "rgba(153, 69, 255, 0.95)";
+          ctx.lineWidth = 2.5 / zoom;
+          ctx.setLineDash([snakeLen, gapLen]);
+          ctx.lineDashOffset = dashOffset;
+          ctx.strokeRect(rx, ry, rw, rh);
+          ctx.setLineDash([]);
+          ctx.restore();
+
+          // Second pass — white-hot core for the snake head area
+          ctx.save();
+          const headLen = snakeLen * 0.15;
+          ctx.strokeStyle = "rgba(200, 170, 255, 0.7)";
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.setLineDash([headLen, perimeter - headLen]);
+          ctx.lineDashOffset = dashOffset;
+          ctx.strokeRect(rx, ry, rw, rh);
+          ctx.setLineDash([]);
+          ctx.restore();
         } else {
           ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.7)" : "rgba(100, 70, 180, 0.6)";
           ctx.lineWidth = 1.5 / zoom;

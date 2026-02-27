@@ -108,9 +108,7 @@ const RegionSidebar = () => {
 
   const handleBuy = () => {
     if (!r.listing) return;
-    withBusy("buy", () =>
-      buyListedRegion(r.id, r.listing!.seller, "" /* sellerUsdcAta derived on-chain */)
-    );
+    withBusy("buy", () => buyListedRegion(r.id, r.listing!.seller));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
