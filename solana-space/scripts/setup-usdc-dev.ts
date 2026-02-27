@@ -43,7 +43,10 @@ import {
   createKeyPairSignerFromBytes,
   createSolanaRpc,
   type Address,
+  type Instruction,
   getBase58Decoder,
+  getAddressEncoder,
+  getProgramDerivedAddress,
 } from "@solana/kit";
 import { getInitializeInstructionAsync } from "../clients/js/src/generated/instructions/initialize.js";
 import * as fs from "node:fs";
@@ -284,6 +287,92 @@ async function setupTokenAccounts() {
   console.log();
 }
 
+// ── Step 2b: Create treasury ATA on devnet ──────────────────────────
+
+const ASSOCIATED_TOKEN_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address;
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address;
+const SYSTEM_PROGRAM = "11111111111111111111111111111111" as Address;
+
+async function deriveAta(owner: Address, mint: Address): Promise<Address> {
+  const encoder = getAddressEncoder();
+  const [ata] = await getProgramDerivedAddress({
+    programAddress: ASSOCIATED_TOKEN_PROGRAM,
+    seeds: [encoder.encode(owner), encoder.encode(TOKEN_PROGRAM), encoder.encode(mint)],
+  });
+  return ata;
+}
+
+function createAtaIdempotentInstruction(
+  payer: Address,
+  ata: Address,
+  owner: Address,
+  mint: Address
+): Instruction {
+  return {
+    programAddress: ASSOCIATED_TOKEN_PROGRAM,
+    accounts: [
+      { address: payer, role: 3 /* writable + signer */ },
+      { address: ata, role: 1 /* writable */ },
+      { address: owner, role: 0 /* readonly */ },
+      { address: mint, role: 0 /* readonly */ },
+      { address: SYSTEM_PROGRAM, role: 0 /* readonly */ },
+      { address: TOKEN_PROGRAM, role: 0 /* readonly */ },
+    ],
+    data: new Uint8Array([1]), // CreateIdempotent discriminator
+  };
+}
+
+async function createTreasuryAtaDevnet() {
+  console.log("=== Step 2: Create Treasury USDC ATA (devnet) ===");
+
+  const rpc = createSolanaRpc(RPC_URL);
+  const payer = await loadKeypairSigner(KEYPAIR_PATH);
+
+  const owner = TREASURY_WALLET as Address;
+  const mint = USDC_DEV_MINT as Address;
+  const derivedAta = await deriveAta(owner, mint);
+
+  console.log(`  Treasury wallet: ${owner}`);
+  console.log(`  USDC mint:       ${mint}`);
+  console.log(`  Derived ATA:     ${derivedAta}`);
+
+  if (derivedAta !== TREASURY_ATA) {
+    console.warn(`  WARNING: Derived ATA does not match hardcoded TREASURY_ATA (${TREASURY_ATA})`);
+  }
+
+  // Check if ATA already exists
+  const acctInfo = await rpc.getAccountInfo(derivedAta, { encoding: "base64" }).send();
+  if (acctInfo.value) {
+    console.log("  ATA already exists, skipping creation.");
+    console.log();
+    return;
+  }
+
+  console.log("  Creating ATA...");
+  const ix = createAtaIdempotentInstruction(payer.address, derivedAta, owner, mint);
+
+  const { value: blockhash } = await rpc.getLatestBlockhash().send();
+  const message = pipe(
+    createTransactionMessage({ version: 0 }),
+    (m) => setTransactionMessageFeePayer(payer.address, m),
+    (m) => appendTransactionMessageInstructions([ix], m),
+    (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m)
+  );
+
+  const signedTx = await signTransactionMessageWithSigners(message);
+  const base64Tx = getBase64EncodedWireTransaction(signedTx);
+  const signature = await rpc.sendTransaction(base64Tx, { encoding: "base64" }).send();
+
+  const sigStr =
+    typeof signature === "string"
+      ? signature
+      : getBase58Decoder().decode(signature);
+
+  console.log(`  Signature: ${sigStr}`);
+  console.log("  Treasury ATA created.");
+  console.log();
+}
+
 // ── Step 3: Initialize program ──────────────────────────────────────
 
 async function initializeProgram() {
@@ -362,6 +451,7 @@ async function main() {
     await setupTokenAccounts();
   } else {
     await airdropSolDevnet();
+    await createTreasuryAtaDevnet();
     console.log("  USDC-dev mint already exists on devnet.");
     console.log("  Fund USDC-dev via Circle faucet: https://faucet.circle.com/");
     console.log();
