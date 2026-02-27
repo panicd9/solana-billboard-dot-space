@@ -83,7 +83,7 @@ export type UpdateRegionImageInstruction<
         ? WritableAccount<TAccountAsset>
         : TAccountAsset,
       TAccountCollection extends string
-        ? ReadonlyAccount<TAccountCollection>
+        ? WritableAccount<TAccountCollection>
         : TAccountCollection,
       TAccountMplCoreProgram extends string
         ? ReadonlyAccount<TAccountMplCoreProgram>

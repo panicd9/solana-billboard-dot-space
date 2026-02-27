@@ -83,7 +83,7 @@ export type UpdateRegionInstruction<
         ? WritableAccount<TAccountAsset>
         : TAccountAsset,
       TAccountCollection extends string
-        ? ReadonlyAccount<TAccountCollection>
+        ? WritableAccount<TAccountCollection>
         : TAccountCollection,
       TAccountMplCoreProgram extends string
         ? ReadonlyAccount<TAccountMplCoreProgram>
@@ -203,7 +203,7 @@ export async function getUpdateRegionInstructionAsync<
     owner: { value: input.owner ?? null, isWritable: false },
     canvasState: { value: input.canvasState ?? null, isWritable: false },
     asset: { value: input.asset ?? null, isWritable: true },
-    collection: { value: input.collection ?? null, isWritable: false },
+    collection: { value: input.collection ?? null, isWritable: true },
     mplCoreProgram: { value: input.mplCoreProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     payer: { value: input.payer ?? null, isWritable: true },
@@ -323,7 +323,7 @@ export function getUpdateRegionInstruction<
     owner: { value: input.owner ?? null, isWritable: false },
     canvasState: { value: input.canvasState ?? null, isWritable: false },
     asset: { value: input.asset ?? null, isWritable: true },
-    collection: { value: input.collection ?? null, isWritable: false },
+    collection: { value: input.collection ?? null, isWritable: true },
     mplCoreProgram: { value: input.mplCoreProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     payer: { value: input.payer ?? null, isWritable: true },
