@@ -1,4 +1,4 @@
-# Pixel Canvas Studio
+# Solana Billboard
 
 A Solana-powered pixel marketplace where users purchase rectangular grid regions on a shared 1920x1080 canvas, upload images, trade regions via Dutch auctions, and boost visibility — all backed by on-chain NFTs.
 
