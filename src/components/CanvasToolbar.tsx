@@ -1,6 +1,7 @@
 import { LayoutGrid, Compass, Grid, Monitor, Layers, DollarSign, ShoppingCart, Store, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WalletButton from "@/components/WalletButton";
+import WalletBalances from "@/components/WalletBalances";
 import logo from "@/assets/logo.png";
 
 interface Props {
@@ -41,7 +42,8 @@ const CanvasToolbar = ({ view, onViewChange }: Props) => {
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <WalletBalances />
         <WalletButton />
       </div>
     </header>
