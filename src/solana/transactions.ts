@@ -12,6 +12,7 @@ import {
   getProgramDerivedAddress,
   type TransactionSigner,
   type Address,
+  type Instruction,
 } from "@solana/kit";
 import {
   getMintRegionInstructionAsync,
@@ -25,19 +26,39 @@ import {
 import { COLLECTION_ADDRESS, USDC_MINT, TREASURY_USDC_ATA } from "./constants";
 import { getRpc, getRpcSubscriptions } from "./accounts";
 
+const COMPUTE_BUDGET_PROGRAM =
+  "ComputeBudget111111111111111111111111111111" as Address;
+
+function getSetComputeUnitLimitInstruction(units: number): Instruction {
+  const data = new Uint8Array(5);
+  data[0] = 2; // SetComputeUnitLimit discriminator
+  new DataView(data.buffer).setUint32(1, units, true);
+  return {
+    programAddress: COMPUTE_BUDGET_PROGRAM,
+    accounts: [],
+    data,
+  };
+}
+
 async function buildAndSend(
   signer: TransactionSigner,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  instructions: readonly any[]
+  instructions: readonly any[],
+  computeUnits = 400_000
 ): Promise<string> {
   const rpc = getRpc();
   const rpcSubscriptions = getRpcSubscriptions();
   const { value: blockhash } = await rpc.getLatestBlockhash().send();
 
+  const allInstructions = [
+    getSetComputeUnitLimitInstruction(computeUnits),
+    ...instructions,
+  ];
+
   const message = pipe(
     createTransactionMessage({ version: 0 }),
     (m) => setTransactionMessageFeePayer(signer.address, m),
-    (m) => appendTransactionMessageInstructions(instructions, m),
+    (m) => appendTransactionMessageInstructions(allInstructions, m),
     (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m)
   );
 
