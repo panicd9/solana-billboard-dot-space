@@ -83,7 +83,7 @@ import {
 } from "../instructions";
 
 export const SOLANA_SPACE_PROGRAM_ADDRESS =
-  "E8uWtqn6TESpP5aPzzXYgKf6yhwDJP1ACikKPW6X8Lm6" as Address<"E8uWtqn6TESpP5aPzzXYgKf6yhwDJP1ACikKPW6X8Lm6">;
+  "SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS" as Address<"SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS">;
 
 export enum SolanaSpaceAccount {
   Boosts,
@@ -256,7 +256,7 @@ export function identifySolanaSpaceInstruction(
 }
 
 export type ParsedSolanaSpaceInstruction<
-  TProgram extends string = "E8uWtqn6TESpP5aPzzXYgKf6yhwDJP1ACikKPW6X8Lm6",
+  TProgram extends string = "SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS",
 > =
   | ({
       instructionType: SolanaSpaceInstruction.BuyBoost;

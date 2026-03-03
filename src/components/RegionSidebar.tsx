@@ -21,15 +21,14 @@ import {
 } from "@/components/ui/tooltip";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
+import { BLOCK_SIZE } from "@/types/region";
+import { BOOST_HIGHLIGHTED, BOOST_GLOWING, BOOST_TRENDING, SOL_DECIMALS } from "@/solana/constants";
+import { calculateListingCurrentPrice, formatPrice } from "@/solana/pricing";
 import {
-  BLOCK_SIZE,
-  HIGHLIGHT_COST_USDC,
-  GLOW_COST_USDC,
-  TRENDING_COST_USDC,
-} from "@/types/region";
-import { BOOST_HIGHLIGHTED, BOOST_GLOWING, BOOST_TRENDING } from "@/solana/constants";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
-import { USDC_DECIMALS } from "@/solana/constants";
+  BOOST_PRICE_HIGHLIGHTED,
+  BOOST_PRICE_GLOWING,
+  BOOST_PRICE_TRENDING,
+} from "@/solana/constants";
 import { useWalletConnection } from "@solana/react-hooks";
 
 const RegionSidebar = () => {
@@ -101,8 +100,8 @@ const RegionSidebar = () => {
       toast.error("Enter a valid duration");
       return;
     }
-    const spLamports = BigInt(Math.round(sp * 10 ** USDC_DECIMALS));
-    const epLamports = BigInt(Math.round(ep * 10 ** USDC_DECIMALS));
+    const spLamports = BigInt(Math.round(sp * 10 ** SOL_DECIMALS));
+    const epLamports = BigInt(Math.round(ep * 10 ** SOL_DECIMALS));
     withBusy("list", () => listRegion(r.id, spLamports, epLamports, BigInt(dur)));
   };
 
@@ -193,7 +192,7 @@ const RegionSidebar = () => {
           <span className="text-muted-foreground">Status</span>
           <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
             {currentListingPrice !== null
-              ? `Listed @ ${formatUsdc(currentListingPrice)} USDC`
+              ? `Listed @ ${formatPrice(currentListingPrice)} SOL`
               : "Not listed"}
           </span>
         </div>
@@ -319,7 +318,7 @@ const RegionSidebar = () => {
             )}
             {r.isHighlighted
               ? "Highlighted"
-              : `Highlight (${HIGHLIGHT_COST_USDC} USDC)`}
+              : `Highlight (${formatPrice(BOOST_PRICE_HIGHLIGHTED)} SOL)`}
           </Button>
           <Button
             variant="outline"
@@ -335,7 +334,7 @@ const RegionSidebar = () => {
             )}
             {r.hasGlowBorder
               ? "Glowing"
-              : `Border Glow (${GLOW_COST_USDC} USDC)`}
+              : `Border Glow (${formatPrice(BOOST_PRICE_GLOWING)} SOL)`}
           </Button>
           <Button
             variant="outline"
@@ -351,7 +350,7 @@ const RegionSidebar = () => {
             )}
             {r.isTrending
               ? "Trending"
-              : `Pin Trending (${TRENDING_COST_USDC} USDC)`}
+              : `Pin Trending (${formatPrice(BOOST_PRICE_TRENDING)} SOL)`}
           </Button>
         </div>
       )}
@@ -388,7 +387,7 @@ const RegionSidebar = () => {
                 ) : (
                   <ShoppingCart className="w-4 h-4" />
                 )}
-                Buy for {formatUsdc(currentListingPrice)} USDC
+                Buy for {formatPrice(currentListingPrice)} SOL
               </Button>
             )}
           </>
@@ -399,7 +398,7 @@ const RegionSidebar = () => {
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="Start (USDC)"
+                  placeholder="Start (SOL)"
                   value={startPrice}
                   onChange={(e) => setStartPrice(e.target.value)}
                   className="bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -407,7 +406,7 @@ const RegionSidebar = () => {
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="End (USDC)"
+                  placeholder="End (SOL)"
                   value={endPrice}
                   onChange={(e) => setEndPrice(e.target.value)}
                   className="bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"

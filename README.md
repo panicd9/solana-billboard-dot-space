@@ -62,7 +62,7 @@ Edit `.env` with your values:
 ```env
 VITE_SOLANA_NETWORK=devnet
 VITE_RPC_URL=                              # Optional, defaults based on network
-VITE_PROGRAM_ID=DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2
+VITE_PROGRAM_ID=SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS
 VITE_USDC_MINT=Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr
 VITE_COLLECTION_ADDRESS=                   # From setup script output
 VITE_TREASURY_USDC_ATA=                    # From setup script output
@@ -140,7 +140,7 @@ The Anchor program (`solana-space`) manages all state on-chain:
 | `execute_purchase` | Buy a listed region |
 | `buy_boost` | Activate highlight, glow, or trending boosts |
 
-Program ID: `DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2`
+Program ID: `SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS`
 
 ## Architecture
 

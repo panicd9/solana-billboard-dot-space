@@ -8,6 +8,7 @@ export interface AppConfig {
   usdcMint: string;
   collectionAddress: string;
   treasuryUsdcAta: string;
+  treasury: string;
   pinataJwt: string;
   pinataGateway: string;
 }
@@ -35,10 +36,11 @@ function getConfig(): AppConfig {
     network,
     rpcUrl,
     wsUrl: import.meta.env.VITE_WS_URL || DEFAULT_WS[network] || deriveWsUrl(rpcUrl),
-    programId: import.meta.env.VITE_PROGRAM_ID || "DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2",
+    programId: import.meta.env.VITE_PROGRAM_ID || "SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS",
     usdcMint: import.meta.env.VITE_USDC_MINT || "",
     collectionAddress: import.meta.env.VITE_COLLECTION_ADDRESS || "",
     treasuryUsdcAta: import.meta.env.VITE_TREASURY_USDC_ATA || "",
+    treasury: import.meta.env.VITE_TREASURY || "",
     pinataJwt: import.meta.env.VITE_PINATA_JWT || "",
     pinataGateway: import.meta.env.VITE_PINATA_GATEWAY || "",
   };

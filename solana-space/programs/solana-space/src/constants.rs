@@ -19,18 +19,28 @@ pub const CENTER_ZONE_Y: u16 = (GRID_HEIGHT - CENTER_ZONE_HEIGHT) / 2; // 37
 pub const CENTER_ZONE_BLOCKS: u64 =
     (CENTER_ZONE_WIDTH as u64) * (CENTER_ZONE_HEIGHT as u64); // 2040
 
-// Fixed center zone price in USDC (6 decimals)
+// Pricing constants: SOL at 1000 USDC means lamport values are numerically
+// identical to USDC micro-units (9 decimals − 6 decimals = ×1000, ÷1000 rate).
+#[cfg(not(feature = "pay-sol"))]
 pub const CENTER_PRICE_PER_BLOCK: u64 = 120_000; // 0.12 USDC
+#[cfg(feature = "pay-sol")]
+pub const CENTER_PRICE_PER_BLOCK: u64 = 120_000; // 0.00012 SOL (= 0.12 USDC @ 1 SOL = 1000 USDC)
 
-// Linear bonding curve for blocks outside center zone
+#[cfg(not(feature = "pay-sol"))]
 pub const CURVE_START_PRICE: u64 = 10_000;  // 0.01 USDC
+#[cfg(feature = "pay-sol")]
+pub const CURVE_START_PRICE: u64 = 10_000;  // 0.00001 SOL
+
+#[cfg(not(feature = "pay-sol"))]
 pub const CURVE_END_PRICE: u64 = 100_000;   // 0.1 USDC
+#[cfg(feature = "pay-sol")]
+pub const CURVE_END_PRICE: u64 = 100_000;   // 0.0001 SOL
 
 // Total blocks on the bonding curve (everything outside center zone)
 pub const CURVE_TOTAL_BLOCKS: u64 =
     (TOTAL_BLOCKS as u64) - CENTER_ZONE_BLOCKS; // 18696
 
-// USDC decimals
+#[cfg(not(feature = "pay-sol"))]
 pub const USDC_DECIMALS: u8 = 6;
 
 // Maximum URI/link length
@@ -48,10 +58,20 @@ pub const BOOST_HIGHLIGHTED: u8 = 1 << 0; // bit 0 = 1
 pub const BOOST_GLOWING: u8 = 1 << 1; // bit 1 = 2
 pub const BOOST_TRENDING: u8 = 1 << 2; // bit 2 = 4
 
-// Boost prices in USDC (6 decimals)
+#[cfg(not(feature = "pay-sol"))]
 pub const BOOST_PRICE_HIGHLIGHTED: u64 = 1_000_000; // 1 USDC
+#[cfg(feature = "pay-sol")]
+pub const BOOST_PRICE_HIGHLIGHTED: u64 = 1_000_000; // 0.001 SOL
+
+#[cfg(not(feature = "pay-sol"))]
 pub const BOOST_PRICE_GLOWING: u64 = 2_000_000; // 2 USDC
+#[cfg(feature = "pay-sol")]
+pub const BOOST_PRICE_GLOWING: u64 = 2_000_000; // 0.002 SOL
+
+#[cfg(not(feature = "pay-sol"))]
 pub const BOOST_PRICE_TRENDING: u64 = 5_000_000; // 5 USDC
+#[cfg(feature = "pay-sol")]
+pub const BOOST_PRICE_TRENDING: u64 = 5_000_000; // 0.005 SOL
 
 // === Marketplace constants ===
 #[constant]

@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "pay-sol"))]
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+#[cfg(feature = "pay-sol")]
+use anchor_lang::system_program;
 use crate::constants::*;
 use crate::error::ErrorCode;
 use crate::state::{Boosts, CanvasState};
@@ -40,8 +43,10 @@ pub struct BuyBoost<'info> {
     pub boosts: Account<'info, Boosts>,
 
     // --- USDC payment accounts ---
+    #[cfg(not(feature = "pay-sol"))]
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
+    #[cfg(not(feature = "pay-sol"))]
     #[account(
         mut,
         associated_token::mint = usdc_mint,
@@ -49,13 +54,22 @@ pub struct BuyBoost<'info> {
     )]
     pub payer_usdc_ata: InterfaceAccount<'info, TokenAccount>,
 
+    #[cfg(not(feature = "pay-sol"))]
     #[account(
         mut,
         token::mint = usdc_mint,
     )]
     pub treasury_usdc_ata: InterfaceAccount<'info, TokenAccount>,
 
+    #[cfg(not(feature = "pay-sol"))]
     pub token_program: Interface<'info, TokenInterface>,
+
+    // --- SOL payment ---
+    #[cfg(feature = "pay-sol")]
+    /// CHECK: Treasury wallet validated in handler against canvas_state.treasury
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -82,16 +96,22 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
     // 1. Validate at least one valid boost is requested and no unknown bits are set
     require!(flags != 0 && flags & !ALL_BOOSTS == 0, ErrorCode::InvalidBoostType);
 
-    // 2. Validate collection and USDC mint
+    // 2. Validate collection and payment accounts
     {
         let canvas_state = ctx.accounts.canvas_state.load()?;
         require!(
             ctx.accounts.collection.key() == canvas_state.collection,
             ErrorCode::InvalidCollection
         );
+        #[cfg(not(feature = "pay-sol"))]
         require!(
             ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
             ErrorCode::InvalidUsdcMint
+        );
+        #[cfg(feature = "pay-sol")]
+        require!(
+            ctx.accounts.treasury.key() == canvas_state.treasury,
+            ErrorCode::InvalidTreasury
         );
     }
 
@@ -125,16 +145,28 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
         boosts.flags = 0;
     }
 
-    // 6. Calculate total price and transfer USDC from payer to treasury
+    // 6. Calculate total price and transfer payment to treasury
     let price = total_boost_price(flags);
-    let transfer_accounts = TransferChecked {
-        from: ctx.accounts.payer_usdc_ata.to_account_info(),
-        mint: ctx.accounts.usdc_mint.to_account_info(),
-        to: ctx.accounts.treasury_usdc_ata.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
-    };
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_accounts);
-    token_interface::transfer_checked(cpi_ctx, price, USDC_DECIMALS)?;
+    #[cfg(not(feature = "pay-sol"))]
+    {
+        let transfer_accounts = TransferChecked {
+            from: ctx.accounts.payer_usdc_ata.to_account_info(),
+            mint: ctx.accounts.usdc_mint.to_account_info(),
+            to: ctx.accounts.treasury_usdc_ata.to_account_info(),
+            authority: ctx.accounts.payer.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_accounts);
+        token_interface::transfer_checked(cpi_ctx, price, USDC_DECIMALS)?;
+    }
+    #[cfg(feature = "pay-sol")]
+    {
+        let transfer_ix = system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.treasury.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.system_program.to_account_info(), transfer_ix);
+        system_program::transfer(cpi_ctx, price)?;
+    }
 
     // 7. Set all requested boost flags at once
     boosts.flags |= flags;

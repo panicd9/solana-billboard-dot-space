@@ -12,7 +12,6 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getProgramDerivedAddress,
@@ -44,7 +43,6 @@ import {
 } from "@solana/kit";
 import {
   getAccountMetaFactory,
-  getAddressFromResolvedInstructionAccount,
   type ResolvedInstructionAccount,
 } from "@solana/program-client-core";
 import { SOLANA_SPACE_PROGRAM_ADDRESS } from "../programs";
@@ -63,11 +61,7 @@ export type MintRegionInstruction<
   TAccountCanvasState extends string | AccountMeta<string> = string,
   TAccountAsset extends string | AccountMeta<string> = string,
   TAccountCollection extends string | AccountMeta<string> = string,
-  TAccountUsdcMint extends string | AccountMeta<string> = string,
-  TAccountPayerUsdcAta extends string | AccountMeta<string> = string,
-  TAccountTreasuryUsdcAta extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends string | AccountMeta<string> =
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountTreasury extends string | AccountMeta<string> = string,
   TAccountMplCoreProgram extends string | AccountMeta<string> =
     "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
   TAccountSystemProgram extends string | AccountMeta<string> =
@@ -91,18 +85,9 @@ export type MintRegionInstruction<
       TAccountCollection extends string
         ? WritableAccount<TAccountCollection>
         : TAccountCollection,
-      TAccountUsdcMint extends string
-        ? ReadonlyAccount<TAccountUsdcMint>
-        : TAccountUsdcMint,
-      TAccountPayerUsdcAta extends string
-        ? WritableAccount<TAccountPayerUsdcAta>
-        : TAccountPayerUsdcAta,
-      TAccountTreasuryUsdcAta extends string
-        ? WritableAccount<TAccountTreasuryUsdcAta>
-        : TAccountTreasuryUsdcAta,
-      TAccountTokenProgram extends string
-        ? ReadonlyAccount<TAccountTokenProgram>
-        : TAccountTokenProgram,
+      TAccountTreasury extends string
+        ? WritableAccount<TAccountTreasury>
+        : TAccountTreasury,
       TAccountMplCoreProgram extends string
         ? ReadonlyAccount<TAccountMplCoreProgram>
         : TAccountMplCoreProgram,
@@ -174,10 +159,7 @@ export type MintRegionAsyncInput<
   TAccountCanvasState extends string = string,
   TAccountAsset extends string = string,
   TAccountCollection extends string = string,
-  TAccountUsdcMint extends string = string,
-  TAccountPayerUsdcAta extends string = string,
-  TAccountTreasuryUsdcAta extends string = string,
-  TAccountTokenProgram extends string = string,
+  TAccountTreasury extends string = string,
   TAccountMplCoreProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
@@ -187,10 +169,7 @@ export type MintRegionAsyncInput<
   asset: TransactionSigner<TAccountAsset>;
   /** The Metaplex Core collection */
   collection: Address<TAccountCollection>;
-  usdcMint: Address<TAccountUsdcMint>;
-  payerUsdcAta?: Address<TAccountPayerUsdcAta>;
-  treasuryUsdcAta: Address<TAccountTreasuryUsdcAta>;
-  tokenProgram?: Address<TAccountTokenProgram>;
+  treasury: Address<TAccountTreasury>;
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   x: MintRegionInstructionDataArgs["x"];
@@ -206,10 +185,7 @@ export async function getMintRegionInstructionAsync<
   TAccountCanvasState extends string,
   TAccountAsset extends string,
   TAccountCollection extends string,
-  TAccountUsdcMint extends string,
-  TAccountPayerUsdcAta extends string,
-  TAccountTreasuryUsdcAta extends string,
-  TAccountTokenProgram extends string,
+  TAccountTreasury extends string,
   TAccountMplCoreProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
@@ -219,10 +195,7 @@ export async function getMintRegionInstructionAsync<
     TAccountCanvasState,
     TAccountAsset,
     TAccountCollection,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >,
@@ -234,10 +207,7 @@ export async function getMintRegionInstructionAsync<
     TAccountCanvasState,
     TAccountAsset,
     TAccountCollection,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >
@@ -251,10 +221,7 @@ export async function getMintRegionInstructionAsync<
     canvasState: { value: input.canvasState ?? null, isWritable: true },
     asset: { value: input.asset ?? null, isWritable: true },
     collection: { value: input.collection ?? null, isWritable: true },
-    usdcMint: { value: input.usdcMint ?? null, isWritable: false },
-    payerUsdcAta: { value: input.payerUsdcAta ?? null, isWritable: true },
-    treasuryUsdcAta: { value: input.treasuryUsdcAta ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     mplCoreProgram: { value: input.mplCoreProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -275,37 +242,6 @@ export async function getMintRegionInstructionAsync<
       ],
     });
   }
-  if (!accounts.payerUsdcAta.value) {
-    accounts.payerUsdcAta.value = await getProgramDerivedAddress({
-      programAddress:
-        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
-      seeds: [
-        getAddressEncoder().encode(
-          getAddressFromResolvedInstructionAccount(
-            "payer",
-            accounts.payer.value,
-          ),
-        ),
-        getBytesEncoder().encode(
-          new Uint8Array([
-            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
-            126, 255, 0, 169,
-          ]),
-        ),
-        getAddressEncoder().encode(
-          getAddressFromResolvedInstructionAccount(
-            "usdcMint",
-            accounts.usdcMint.value,
-          ),
-        ),
-      ],
-    });
-  }
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
-  }
   if (!accounts.mplCoreProgram.value) {
     accounts.mplCoreProgram.value =
       "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d" as Address<"CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d">;
@@ -322,10 +258,7 @@ export async function getMintRegionInstructionAsync<
       getAccountMeta("canvasState", accounts.canvasState),
       getAccountMeta("asset", accounts.asset),
       getAccountMeta("collection", accounts.collection),
-      getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("payerUsdcAta", accounts.payerUsdcAta),
-      getAccountMeta("treasuryUsdcAta", accounts.treasuryUsdcAta),
-      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("treasury", accounts.treasury),
       getAccountMeta("mplCoreProgram", accounts.mplCoreProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
@@ -339,10 +272,7 @@ export async function getMintRegionInstructionAsync<
     TAccountCanvasState,
     TAccountAsset,
     TAccountCollection,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >);
@@ -353,10 +283,7 @@ export type MintRegionInput<
   TAccountCanvasState extends string = string,
   TAccountAsset extends string = string,
   TAccountCollection extends string = string,
-  TAccountUsdcMint extends string = string,
-  TAccountPayerUsdcAta extends string = string,
-  TAccountTreasuryUsdcAta extends string = string,
-  TAccountTokenProgram extends string = string,
+  TAccountTreasury extends string = string,
   TAccountMplCoreProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
@@ -366,10 +293,7 @@ export type MintRegionInput<
   asset: TransactionSigner<TAccountAsset>;
   /** The Metaplex Core collection */
   collection: Address<TAccountCollection>;
-  usdcMint: Address<TAccountUsdcMint>;
-  payerUsdcAta: Address<TAccountPayerUsdcAta>;
-  treasuryUsdcAta: Address<TAccountTreasuryUsdcAta>;
-  tokenProgram?: Address<TAccountTokenProgram>;
+  treasury: Address<TAccountTreasury>;
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   x: MintRegionInstructionDataArgs["x"];
@@ -385,10 +309,7 @@ export function getMintRegionInstruction<
   TAccountCanvasState extends string,
   TAccountAsset extends string,
   TAccountCollection extends string,
-  TAccountUsdcMint extends string,
-  TAccountPayerUsdcAta extends string,
-  TAccountTreasuryUsdcAta extends string,
-  TAccountTokenProgram extends string,
+  TAccountTreasury extends string,
   TAccountMplCoreProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
@@ -398,10 +319,7 @@ export function getMintRegionInstruction<
     TAccountCanvasState,
     TAccountAsset,
     TAccountCollection,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >,
@@ -412,10 +330,7 @@ export function getMintRegionInstruction<
   TAccountCanvasState,
   TAccountAsset,
   TAccountCollection,
-  TAccountUsdcMint,
-  TAccountPayerUsdcAta,
-  TAccountTreasuryUsdcAta,
-  TAccountTokenProgram,
+  TAccountTreasury,
   TAccountMplCoreProgram,
   TAccountSystemProgram
 > {
@@ -428,10 +343,7 @@ export function getMintRegionInstruction<
     canvasState: { value: input.canvasState ?? null, isWritable: true },
     asset: { value: input.asset ?? null, isWritable: true },
     collection: { value: input.collection ?? null, isWritable: true },
-    usdcMint: { value: input.usdcMint ?? null, isWritable: false },
-    payerUsdcAta: { value: input.payerUsdcAta ?? null, isWritable: true },
-    treasuryUsdcAta: { value: input.treasuryUsdcAta ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     mplCoreProgram: { value: input.mplCoreProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -444,10 +356,6 @@ export function getMintRegionInstruction<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
-  }
   if (!accounts.mplCoreProgram.value) {
     accounts.mplCoreProgram.value =
       "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d" as Address<"CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d">;
@@ -464,10 +372,7 @@ export function getMintRegionInstruction<
       getAccountMeta("canvasState", accounts.canvasState),
       getAccountMeta("asset", accounts.asset),
       getAccountMeta("collection", accounts.collection),
-      getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("payerUsdcAta", accounts.payerUsdcAta),
-      getAccountMeta("treasuryUsdcAta", accounts.treasuryUsdcAta),
-      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("treasury", accounts.treasury),
       getAccountMeta("mplCoreProgram", accounts.mplCoreProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
@@ -481,10 +386,7 @@ export function getMintRegionInstruction<
     TAccountCanvasState,
     TAccountAsset,
     TAccountCollection,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >);
@@ -502,12 +404,9 @@ export type ParsedMintRegionInstruction<
     asset: TAccountMetas[2];
     /** The Metaplex Core collection */
     collection: TAccountMetas[3];
-    usdcMint: TAccountMetas[4];
-    payerUsdcAta: TAccountMetas[5];
-    treasuryUsdcAta: TAccountMetas[6];
-    tokenProgram: TAccountMetas[7];
-    mplCoreProgram: TAccountMetas[8];
-    systemProgram: TAccountMetas[9];
+    treasury: TAccountMetas[4];
+    mplCoreProgram: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
   };
   data: MintRegionInstructionData;
 };
@@ -520,12 +419,12 @@ export function parseMintRegionInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMintRegionInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 10) {
+  if (instruction.accounts.length < 7) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 10,
+        expectedAccountMetas: 7,
       },
     );
   }
@@ -542,10 +441,7 @@ export function parseMintRegionInstruction<
       canvasState: getNextAccount(),
       asset: getNextAccount(),
       collection: getNextAccount(),
-      usdcMint: getNextAccount(),
-      payerUsdcAta: getNextAccount(),
-      treasuryUsdcAta: getNextAccount(),
-      tokenProgram: getNextAccount(),
+      treasury: getNextAccount(),
       mplCoreProgram: getNextAccount(),
       systemProgram: getNextAccount(),
     },

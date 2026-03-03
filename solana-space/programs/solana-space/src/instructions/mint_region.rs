@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "pay-sol"))]
 use anchor_spl::token_interface::{
     self, Mint, TokenAccount, TokenInterface, TransferChecked,
 };
+#[cfg(feature = "pay-sol")]
+use anchor_lang::system_program;
 use mpl_core::{
     instructions::CreateV2CpiBuilder,
     types::{Attribute, Attributes, Plugin, PluginAuthority, PluginAuthorityPair},
@@ -42,9 +45,11 @@ pub struct MintRegion<'info> {
     #[account(mut)]
     pub collection: AccountInfo<'info>,
 
-    // --- USDC payment accounts ---
+    // --- USDC payment accounts (compiled out when pay-sol is enabled) ---
+    #[cfg(not(feature = "pay-sol"))]
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
+    #[cfg(not(feature = "pay-sol"))]
     #[account(
         mut,
         associated_token::mint = usdc_mint,
@@ -52,13 +57,21 @@ pub struct MintRegion<'info> {
     )]
     pub payer_usdc_ata: InterfaceAccount<'info, TokenAccount>,
 
+    #[cfg(not(feature = "pay-sol"))]
     #[account(
         mut,
         token::mint = usdc_mint,
     )]
     pub treasury_usdc_ata: InterfaceAccount<'info, TokenAccount>,
 
+    #[cfg(not(feature = "pay-sol"))]
     pub token_program: Interface<'info, TokenInterface>,
+
+    // --- SOL payment: treasury receives native lamports ---
+    #[cfg(feature = "pay-sol")]
+    /// CHECK: Treasury wallet validated in handler against canvas_state.treasury
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
 
     /// CHECK: Metaplex Core program
     #[account(address = mpl_core::ID)]
@@ -162,16 +175,22 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
     require!(args.image_uri.len() <= MAX_URI_LENGTH, ErrorCode::UriTooLong);
     require!(args.link.len() <= MAX_LINK_LENGTH, ErrorCode::LinkTooLong);
 
-    // 2. Validate collection and usdc_mint, check bitmap, read current curve supply
+    // 2. Validate collection, payment mint, check bitmap, read current curve supply
     let curve_blocks_sold = {
         let canvas_state = ctx.accounts.canvas_state.load()?;
         require!(
             ctx.accounts.collection.key() == canvas_state.collection,
             ErrorCode::InvalidCollection
         );
+        #[cfg(not(feature = "pay-sol"))]
         require!(
             ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
             ErrorCode::InvalidUsdcMint
+        );
+        #[cfg(feature = "pay-sol")]
+        require!(
+            ctx.accounts.treasury.key() == canvas_state.treasury,
+            ErrorCode::InvalidTreasury
         );
         require!(
             canvas_state.is_region_free(args.x, args.y, args.width, args.height),
@@ -184,15 +203,27 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
     let total_price =
         calculate_region_price(args.x, args.y, args.width, args.height, curve_blocks_sold)?;
 
-    // 4. Transfer USDC from payer to treasury
-    let transfer_accounts = TransferChecked {
-        from: ctx.accounts.payer_usdc_ata.to_account_info(),
-        mint: ctx.accounts.usdc_mint.to_account_info(),
-        to: ctx.accounts.treasury_usdc_ata.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
-    };
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_accounts);
-    token_interface::transfer_checked(cpi_ctx, total_price, USDC_DECIMALS)?;
+    // 4. Transfer payment from payer to treasury
+    #[cfg(not(feature = "pay-sol"))]
+    {
+        let transfer_accounts = TransferChecked {
+            from: ctx.accounts.payer_usdc_ata.to_account_info(),
+            mint: ctx.accounts.usdc_mint.to_account_info(),
+            to: ctx.accounts.treasury_usdc_ata.to_account_info(),
+            authority: ctx.accounts.payer.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_accounts);
+        token_interface::transfer_checked(cpi_ctx, total_price, USDC_DECIMALS)?;
+    }
+    #[cfg(feature = "pay-sol")]
+    {
+        let transfer_ix = system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.treasury.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(ctx.accounts.system_program.to_account_info(), transfer_ix);
+        system_program::transfer(cpi_ctx, total_price)?;
+    }
 
     // 5. Mark bitmap as occupied and update counters
     let bump = {

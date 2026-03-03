@@ -1,4 +1,6 @@
 [toolchain]
+anchor_version = "0.32.1"
+solana_version = "3.1.9"
 package_manager = "yarn"
 
 [features]
@@ -6,7 +8,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-solana_space = "E8uWtqn6TESpP5aPzzXYgKf6yhwDJP1ACikKPW6X8Lm6"
+solana_space = "SBStHFH5xc7iBpD6osdYP5VAMXks3vz6rToWqCLdXeS"
 
 [registry]
 url = "https://api.apr.dev"

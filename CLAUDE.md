@@ -1,8 +1,29 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this monorepo.
 
-## Commands
+## Project Overview
+
+**Solana Billboard** (solanabillboard.space) — a Solana pixel marketplace where users purchase rectangular grid regions as Metaplex Core NFTs, upload images, and trade them. 192×108 grid of 10px blocks = 1920×1080 canvas.
+
+## Repository Structure
+
+```
+solana-billboard/
+├── src/                  # React frontend (Vite + React 18 + TypeScript + Tailwind + shadcn/ui)
+├── solana-space/         # Anchor program + generated TS client
+│   ├── programs/         # Rust on-chain program
+│   ├── clients/js/       # Codama-generated TypeScript client
+│   ├── scripts/          # Deploy & setup scripts
+│   └── tests/            # Anchor tests
+└── CLAUDE.md             # This file
+```
+
+Each subdirectory has its own CLAUDE.md with detailed guidance:
+- **Frontend**: see conventions, commands, and architecture in this root (below)
+- **On-chain program**: see `solana-space/CLAUDE.md`
+
+## Frontend Commands
 
 ```bash
 npm run dev          # Start dev server (port 8080)
@@ -13,50 +34,34 @@ npm run test         # Run tests once (vitest run)
 npm run test:watch   # Watch mode (vitest)
 ```
 
-## Architecture
+## Solana Program Commands
 
-**Pixel Canvas Studio** is a Solana-integrated pixel marketplace SPA where users purchase rectangular grid regions, upload images to them, and trade them. Built with Vite + React 18 + TypeScript + Tailwind CSS + shadcn/ui.
+```bash
+cd solana-space
+anchor build                        # Build program (USDC mode)
+anchor build -- --features pay-sol  # Build program (SOL mode, for devnet)
+anchor test                         # Build + test (localnet)
+yarn codama                         # Regenerate TS client from IDL
+surfpool                            # Start local validator (Surfnet)
+npx tsx scripts/initialize.ts       # Initialize canvas on-chain
+npx tsx scripts/setup-usdc-dev.ts   # Fund wallets with dev USDC (USDC mode only)
+```
 
-### Provider Stack (App.tsx)
+## Payment Modes
 
-`QueryClientProvider` → `SolanaProvider` → `TooltipProvider` → `BrowserRouter`
+The program supports two compile-time payment modes via Cargo feature flags:
 
-- **SolanaProvider** wraps `@solana/wallet-adapter-react` configured for devnet with Phantom wallet
-- **RegionProvider** (mounted in `pages/Index.tsx`, not App) holds all pixel region state
+- **USDC mode** (default): `anchor build` — payments via SPL token transfers (USDC mint + ATAs)
+- **SOL mode**: `anchor build -- --features pay-sol` — payments via native SOL transfers (system program)
 
-### Core Data Flow
+SOL pricing assumes SOL ≈ 1000 USDC (numerical lamport values are identical to USDC micro-units).
 
-All region state lives in `RegionContext` (`src/context/RegionContext.tsx`):
-- `regions: Region[]` — purchased pixel regions
-- `occupancy: Map<string, string>` — `"col:row"` → `regionId` for fast collision detection
-- `loadedImages: Map<string, HTMLImageElement>` — preloaded images for canvas rendering
-- Operations: `purchaseRegion`, `setRegionImage`, `listRegion`, `unlistRegion`, `buyListedRegion`
+After switching modes, regenerate the TS client (`yarn codama`) and set `.env` vars:
+- SOL mode: `VITE_TREASURY` (wallet pubkey)
+- USDC mode: `VITE_TREASURY_USDC_ATA` (token account)
 
-**Currently all state is client-side with mock addresses. No on-chain program calls yet.**
+## Conventions (All Code)
 
-### Grid System (src/types/region.ts)
-
-192×108 grid of 10px blocks = 1920×1080 canvas. Regions are rectangles defined by `(startX, startY, width, height)` in grid coordinates. Price: 0.01 SOL per block.
-
-### Key Components
-
-| Component | Role |
-|-----------|------|
-| `PixelCanvas` | Canvas2D renderer — drag-to-select regions, renders region images, hover tooltips |
-| `PurchasePanel` | Floating panel for buying selected region + image upload |
-| `RegionSidebar` | Details panel for a selected region (edit image/URL, list/unlist, buy) |
-| `MarketplaceView` | Grid listing of all regions with sort options |
-| `CanvasToolbar` | Header with canvas/marketplace toggle + wallet connect |
-
-### Routing
-
-Single page app: `/` renders `Index`, `*` renders `NotFound`. Views toggle between canvas and marketplace via local state, not routes.
-
-## Conventions
-
-- Import paths use `@/` alias mapping to `./src`
-- UI primitives are in `src/components/ui/` (shadcn/ui — do not manually edit these)
-- Custom components go directly in `src/components/`
-- Dark theme only — CSS variables defined in `src/index.css` with teal primary (#00D2BE) and gold accent (#FFC837)
-- Fonts: Space Grotesk (headings), JetBrains Mono (code)
-- `global: "globalThis"` is defined in vite.config.ts for Buffer polyfill compatibility
+- Import paths use `@/` alias → `./src` and `@/generated/` → `./solana-space/clients/js/src/generated`
+- Solana client code uses `@solana/kit` (v6) — NOT legacy `@solana/web3.js`
+- Program interactions go through Codama-generated client in `solana-space/clients/js/`

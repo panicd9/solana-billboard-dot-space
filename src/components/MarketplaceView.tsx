@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { ArrowUpDown, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRegions } from "@/context/RegionContext";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import { calculateListingCurrentPrice, formatPrice } from "@/solana/pricing";
 
 interface Props {
   onHighlightRegion: (regionId: string) => void;
@@ -57,7 +57,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
             {sorted.map((r) => {
               const currentPrice =
                 r.isListed && r.listing
-                  ? formatUsdc(
+                  ? formatPrice(
                       calculateListingCurrentPrice(
                         r.listing.startPrice,
                         r.listing.endPrice,
@@ -105,7 +105,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Status</span>
                       <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
-                        {currentPrice ? `Listed @ ${currentPrice} USDC` : "Unlisted"}
+                        {currentPrice ? `Listed @ ${currentPrice} SOL` : "Unlisted"}
                       </span>
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-import { useBalance, useSplToken, useWalletConnection } from "@solana/react-hooks";
+import { useBalance, useWalletConnection } from "@solana/react-hooks";
 import { HelpCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { config } from "@/config/env";
@@ -20,16 +20,8 @@ const WalletBalances = () => {
   const address = connected && wallet ? wallet.account.address : undefined;
 
   const { lamports } = useBalance(address);
-  const { balance: usdcBalance, status: usdcStatus } = useSplToken(
-    config.usdcMint || undefined
-  );
 
   if (!connected) return null;
-
-  const usdcAmount =
-    usdcStatus === "ready" && usdcBalance
-      ? usdcBalance.uiAmount ?? "0.00"
-      : "—";
 
   return (
     <div className="flex items-center gap-3 text-xs font-mono">
@@ -37,12 +29,6 @@ const WalletBalances = () => {
         <span className="text-primary font-semibold">{formatSol(lamports)}</span>{" "}
         SOL
       </span>
-      {config.usdcMint && (
-        <span className="text-muted-foreground">
-          <span className="text-[#2775CA] font-semibold">{usdcAmount}</span>{" "}
-          USDC
-        </span>
-      )}
       {isDevnet && (
         <Popover>
           <PopoverTrigger asChild>
@@ -51,16 +37,11 @@ const WalletBalances = () => {
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-3 text-xs" side="bottom" align="end">
-            <p className="font-semibold text-foreground mb-2">Devnet Faucets</p>
+            <p className="font-semibold text-foreground mb-2">Devnet Faucet</p>
             <ul className="space-y-1.5">
               <li>
                 <a href="https://faucet.solana.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   Get SOL →
-                </a>
-              </li>
-              <li>
-                <a href="https://spl-token-faucet.com/" target="_blank" rel="noopener noreferrer" className="text-[#2775CA] hover:underline">
-                  Get USDC →
                 </a>
               </li>
             </ul>

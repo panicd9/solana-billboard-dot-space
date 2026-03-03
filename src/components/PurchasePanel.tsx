@@ -13,12 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Selection, BLOCK_SIZE } from "@/types/region";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
-import { countCenterAndCurveBlocks, formatUsdc } from "@/solana/pricing";
+import { countCenterAndCurveBlocks, formatPrice } from "@/solana/pricing";
 import {
   CENTER_PRICE_PER_BLOCK,
   CURVE_START_PRICE,
   CURVE_END_PRICE,
-  USDC_DECIMALS,
+  SOL_DECIMALS,
 } from "@/solana/constants";
 
 interface Props {
@@ -182,7 +182,7 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
                   <HelpCircle className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <span className="text-accent">{price?.display ?? "..."} USDC</span>
+              <span className="text-accent">{price?.display ?? "..."} SOL</span>
             </div>
             {showPricingOverlay && selection && <PricingBreakdown selection={selection} />}
           </div>
@@ -337,10 +337,10 @@ const PricingBreakdown = ({ selection }: { selection: Selection }) => {
     selection.width,
     selection.height
   );
-  const centerPrice = formatUsdc(centerCount * CENTER_PRICE_PER_BLOCK);
-  const curveStartDisplay = (Number(CURVE_START_PRICE) / 10 ** USDC_DECIMALS).toFixed(2);
-  const curveEndDisplay = (Number(CURVE_END_PRICE) / 10 ** USDC_DECIMALS).toFixed(2);
-  const centerPriceDisplay = (Number(CENTER_PRICE_PER_BLOCK) / 10 ** USDC_DECIMALS).toFixed(2);
+  const centerPrice = formatPrice(centerCount * CENTER_PRICE_PER_BLOCK);
+  const curveStartDisplay = (Number(CURVE_START_PRICE) / 10 ** SOL_DECIMALS).toFixed(5);
+  const curveEndDisplay = (Number(CURVE_END_PRICE) / 10 ** SOL_DECIMALS).toFixed(4);
+  const centerPriceDisplay = (Number(CENTER_PRICE_PER_BLOCK) / 10 ** SOL_DECIMALS).toFixed(5);
 
   return (
     <div className="rounded-md bg-muted/50 border border-border p-2.5 space-y-2 text-xs">
@@ -351,7 +351,7 @@ const PricingBreakdown = ({ selection }: { selection: Selection }) => {
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm bg-amber-400/80 shrink-0" />
           <span className="text-muted-foreground">Center zone</span>
-          <span className="ml-auto text-foreground font-mono">{centerPriceDisplay} USDC/block</span>
+          <span className="ml-auto text-foreground font-mono">{centerPriceDisplay} SOL/block</span>
         </div>
         <p className="text-muted-foreground/70 text-[10px] pl-3.5">
           60x34 premium area — fixed price
@@ -377,7 +377,7 @@ const PricingBreakdown = ({ selection }: { selection: Selection }) => {
           {centerCount > 0n && (
             <div className="flex justify-between text-muted-foreground">
               <span>{centerCount.toString()} center block{centerCount > 1n ? "s" : ""}</span>
-              <span className="text-foreground font-mono">{centerPrice} USDC</span>
+              <span className="text-foreground font-mono">{centerPrice} SOL</span>
             </div>
           )}
           {curveCount > 0n && (

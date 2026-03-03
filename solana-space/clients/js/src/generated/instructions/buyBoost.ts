@@ -58,11 +58,7 @@ export type BuyBoostInstruction<
   TAccountAsset extends string | AccountMeta<string> = string,
   TAccountCollection extends string | AccountMeta<string> = string,
   TAccountBoosts extends string | AccountMeta<string> = string,
-  TAccountUsdcMint extends string | AccountMeta<string> = string,
-  TAccountPayerUsdcAta extends string | AccountMeta<string> = string,
-  TAccountTreasuryUsdcAta extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends string | AccountMeta<string> =
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountTreasury extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -86,18 +82,9 @@ export type BuyBoostInstruction<
       TAccountBoosts extends string
         ? WritableAccount<TAccountBoosts>
         : TAccountBoosts,
-      TAccountUsdcMint extends string
-        ? ReadonlyAccount<TAccountUsdcMint>
-        : TAccountUsdcMint,
-      TAccountPayerUsdcAta extends string
-        ? WritableAccount<TAccountPayerUsdcAta>
-        : TAccountPayerUsdcAta,
-      TAccountTreasuryUsdcAta extends string
-        ? WritableAccount<TAccountTreasuryUsdcAta>
-        : TAccountTreasuryUsdcAta,
-      TAccountTokenProgram extends string
-        ? ReadonlyAccount<TAccountTokenProgram>
-        : TAccountTokenProgram,
+      TAccountTreasury extends string
+        ? WritableAccount<TAccountTreasury>
+        : TAccountTreasury,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -155,10 +142,7 @@ export type BuyBoostAsyncInput<
   TAccountAsset extends string = string,
   TAccountCollection extends string = string,
   TAccountBoosts extends string = string,
-  TAccountUsdcMint extends string = string,
-  TAccountPayerUsdcAta extends string = string,
-  TAccountTreasuryUsdcAta extends string = string,
-  TAccountTokenProgram extends string = string,
+  TAccountTreasury extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   payer: TransactionSigner<TAccountPayer>;
@@ -168,10 +152,7 @@ export type BuyBoostAsyncInput<
   /** The collection account */
   collection: Address<TAccountCollection>;
   boosts?: Address<TAccountBoosts>;
-  usdcMint: Address<TAccountUsdcMint>;
-  payerUsdcAta?: Address<TAccountPayerUsdcAta>;
-  treasuryUsdcAta: Address<TAccountTreasuryUsdcAta>;
-  tokenProgram?: Address<TAccountTokenProgram>;
+  treasury: Address<TAccountTreasury>;
   systemProgram?: Address<TAccountSystemProgram>;
   boostFlags: BuyBoostInstructionDataArgs["boostFlags"];
 };
@@ -182,10 +163,7 @@ export async function getBuyBoostInstructionAsync<
   TAccountAsset extends string,
   TAccountCollection extends string,
   TAccountBoosts extends string,
-  TAccountUsdcMint extends string,
-  TAccountPayerUsdcAta extends string,
-  TAccountTreasuryUsdcAta extends string,
-  TAccountTokenProgram extends string,
+  TAccountTreasury extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
 >(
@@ -195,10 +173,7 @@ export async function getBuyBoostInstructionAsync<
     TAccountAsset,
     TAccountCollection,
     TAccountBoosts,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -210,10 +185,7 @@ export async function getBuyBoostInstructionAsync<
     TAccountAsset,
     TAccountCollection,
     TAccountBoosts,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountSystemProgram
   >
 > {
@@ -227,10 +199,7 @@ export async function getBuyBoostInstructionAsync<
     asset: { value: input.asset ?? null, isWritable: false },
     collection: { value: input.collection ?? null, isWritable: false },
     boosts: { value: input.boosts ?? null, isWritable: true },
-    usdcMint: { value: input.usdcMint ?? null, isWritable: false },
-    payerUsdcAta: { value: input.payerUsdcAta ?? null, isWritable: true },
-    treasuryUsdcAta: { value: input.treasuryUsdcAta ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -264,37 +233,6 @@ export async function getBuyBoostInstructionAsync<
       ],
     });
   }
-  if (!accounts.payerUsdcAta.value) {
-    accounts.payerUsdcAta.value = await getProgramDerivedAddress({
-      programAddress:
-        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
-      seeds: [
-        getAddressEncoder().encode(
-          getAddressFromResolvedInstructionAccount(
-            "payer",
-            accounts.payer.value,
-          ),
-        ),
-        getBytesEncoder().encode(
-          new Uint8Array([
-            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
-            126, 255, 0, 169,
-          ]),
-        ),
-        getAddressEncoder().encode(
-          getAddressFromResolvedInstructionAccount(
-            "usdcMint",
-            accounts.usdcMint.value,
-          ),
-        ),
-      ],
-    });
-  }
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
-  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -308,10 +246,7 @@ export async function getBuyBoostInstructionAsync<
       getAccountMeta("asset", accounts.asset),
       getAccountMeta("collection", accounts.collection),
       getAccountMeta("boosts", accounts.boosts),
-      getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("payerUsdcAta", accounts.payerUsdcAta),
-      getAccountMeta("treasuryUsdcAta", accounts.treasuryUsdcAta),
-      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("treasury", accounts.treasury),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getBuyBoostInstructionDataEncoder().encode(
@@ -325,10 +260,7 @@ export async function getBuyBoostInstructionAsync<
     TAccountAsset,
     TAccountCollection,
     TAccountBoosts,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountSystemProgram
   >);
 }
@@ -339,10 +271,7 @@ export type BuyBoostInput<
   TAccountAsset extends string = string,
   TAccountCollection extends string = string,
   TAccountBoosts extends string = string,
-  TAccountUsdcMint extends string = string,
-  TAccountPayerUsdcAta extends string = string,
-  TAccountTreasuryUsdcAta extends string = string,
-  TAccountTokenProgram extends string = string,
+  TAccountTreasury extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   payer: TransactionSigner<TAccountPayer>;
@@ -352,10 +281,7 @@ export type BuyBoostInput<
   /** The collection account */
   collection: Address<TAccountCollection>;
   boosts: Address<TAccountBoosts>;
-  usdcMint: Address<TAccountUsdcMint>;
-  payerUsdcAta: Address<TAccountPayerUsdcAta>;
-  treasuryUsdcAta: Address<TAccountTreasuryUsdcAta>;
-  tokenProgram?: Address<TAccountTokenProgram>;
+  treasury: Address<TAccountTreasury>;
   systemProgram?: Address<TAccountSystemProgram>;
   boostFlags: BuyBoostInstructionDataArgs["boostFlags"];
 };
@@ -366,10 +292,7 @@ export function getBuyBoostInstruction<
   TAccountAsset extends string,
   TAccountCollection extends string,
   TAccountBoosts extends string,
-  TAccountUsdcMint extends string,
-  TAccountPayerUsdcAta extends string,
-  TAccountTreasuryUsdcAta extends string,
-  TAccountTokenProgram extends string,
+  TAccountTreasury extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
 >(
@@ -379,10 +302,7 @@ export function getBuyBoostInstruction<
     TAccountAsset,
     TAccountCollection,
     TAccountBoosts,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -393,10 +313,7 @@ export function getBuyBoostInstruction<
   TAccountAsset,
   TAccountCollection,
   TAccountBoosts,
-  TAccountUsdcMint,
-  TAccountPayerUsdcAta,
-  TAccountTreasuryUsdcAta,
-  TAccountTokenProgram,
+  TAccountTreasury,
   TAccountSystemProgram
 > {
   // Program address.
@@ -409,10 +326,7 @@ export function getBuyBoostInstruction<
     asset: { value: input.asset ?? null, isWritable: false },
     collection: { value: input.collection ?? null, isWritable: false },
     boosts: { value: input.boosts ?? null, isWritable: true },
-    usdcMint: { value: input.usdcMint ?? null, isWritable: false },
-    payerUsdcAta: { value: input.payerUsdcAta ?? null, isWritable: true },
-    treasuryUsdcAta: { value: input.treasuryUsdcAta ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -424,10 +338,6 @@ export function getBuyBoostInstruction<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
-  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -441,10 +351,7 @@ export function getBuyBoostInstruction<
       getAccountMeta("asset", accounts.asset),
       getAccountMeta("collection", accounts.collection),
       getAccountMeta("boosts", accounts.boosts),
-      getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("payerUsdcAta", accounts.payerUsdcAta),
-      getAccountMeta("treasuryUsdcAta", accounts.treasuryUsdcAta),
-      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("treasury", accounts.treasury),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
     data: getBuyBoostInstructionDataEncoder().encode(
@@ -458,10 +365,7 @@ export function getBuyBoostInstruction<
     TAccountAsset,
     TAccountCollection,
     TAccountBoosts,
-    TAccountUsdcMint,
-    TAccountPayerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountSystemProgram
   >);
 }
@@ -479,11 +383,8 @@ export type ParsedBuyBoostInstruction<
     /** The collection account */
     collection: TAccountMetas[3];
     boosts: TAccountMetas[4];
-    usdcMint: TAccountMetas[5];
-    payerUsdcAta: TAccountMetas[6];
-    treasuryUsdcAta: TAccountMetas[7];
-    tokenProgram: TAccountMetas[8];
-    systemProgram: TAccountMetas[9];
+    treasury: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
   };
   data: BuyBoostInstructionData;
 };
@@ -496,12 +397,12 @@ export function parseBuyBoostInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedBuyBoostInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 10) {
+  if (instruction.accounts.length < 7) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 10,
+        expectedAccountMetas: 7,
       },
     );
   }
@@ -519,10 +420,7 @@ export function parseBuyBoostInstruction<
       asset: getNextAccount(),
       collection: getNextAccount(),
       boosts: getNextAccount(),
-      usdcMint: getNextAccount(),
-      payerUsdcAta: getNextAccount(),
-      treasuryUsdcAta: getNextAccount(),
-      tokenProgram: getNextAccount(),
+      treasury: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getBuyBoostInstructionDataDecoder().decode(instruction.data),
