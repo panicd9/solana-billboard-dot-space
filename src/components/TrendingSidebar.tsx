@@ -15,8 +15,9 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
   if (trendingRegions.length === 0) return null;
 
   return (
-    <div
-      className={`bg-card border-r border-border flex flex-col h-full shrink-0 transition-all duration-200 ${
+    <aside
+      aria-label="Trending regions"
+      className={`hidden md:flex bg-card border-r border-border flex-col h-full shrink-0 transition-all duration-200 ${
         collapsed ? "w-10" : "w-56"
       }`}
     >
@@ -31,13 +32,15 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
           </>
         )}
         <button
+          type="button"
           onClick={onToggleCollapse}
-          className={`p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground ${
+          className={`cursor-pointer p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             collapsed ? "mx-auto" : ""
           }`}
-          title={collapsed ? "Show trending" : "Hide trending"}
+          aria-label={collapsed ? "Show trending" : "Hide trending"}
+          aria-expanded={!collapsed}
         >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          {collapsed ? <ChevronRight className="w-4 h-4" aria-hidden="true" /> : <ChevronLeft className="w-4 h-4" aria-hidden="true" />}
         </button>
       </div>
       {!collapsed && (
@@ -45,8 +48,9 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
           {trendingRegions.map((r) => (
             <button
               key={r.id}
+              type="button"
               onClick={() => onSelectRegion(r)}
-              className="w-full text-left p-3 border-b border-border hover:bg-muted/50 transition-colors"
+              className="cursor-pointer w-full text-left p-3 border-b border-border hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <div className="flex items-center gap-2">
                 {r.imageUrl ? (
@@ -82,7 +86,7 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
           ))}
         </div>
       )}
-    </div>
+    </aside>
   );
 };
 

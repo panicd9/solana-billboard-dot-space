@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   X,
   ExternalLink,
@@ -19,6 +19,13 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
 import {
@@ -51,6 +58,15 @@ const RegionSidebar = () => {
   const [linkValue, setLinkValue] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!selectedRegion) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedRegion(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedRegion, setSelectedRegion]);
 
   if (!selectedRegion) return null;
 
@@ -139,14 +155,19 @@ const RegionSidebar = () => {
   };
 
   return (
-    <div className="w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto">
+    <aside
+      aria-label="Region details panel"
+      className="w-full sm:w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto"
+    >
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground">Region Details</h3>
         <button
+          type="button"
           onClick={() => setSelectedRegion(null)}
-          className="text-muted-foreground hover:text-foreground"
+          className="cursor-pointer text-muted-foreground hover:text-foreground p-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Close region details"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
 
@@ -259,12 +280,16 @@ const RegionSidebar = () => {
 
           {editingLink ? (
             <div className="flex gap-2">
+              <label htmlFor="region-link" className="sr-only">
+                Region link URL
+              </label>
               <input
+                id="region-link"
                 type="url"
                 placeholder="https://..."
                 value={linkValue}
                 onChange={(e) => setLinkValue(e.target.value)}
-                className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="flex-1 bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <Button
                 size="sm"
@@ -396,38 +421,56 @@ const RegionSidebar = () => {
           isOwner && (
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Start (USDC)"
-                  value={startPrice}
-                  onChange={(e) => setStartPrice(e.target.value)}
-                  className="bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="End (USDC)"
-                  value={endPrice}
-                  onChange={(e) => setEndPrice(e.target.value)}
-                  className="bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
+                <div>
+                  <label htmlFor="listing-start-price" className="sr-only">
+                    Start price in USDC
+                  </label>
+                  <input
+                    id="listing-start-price"
+                    type="number"
+                    step="0.01"
+                    placeholder="Start (USDC)"
+                    value={startPrice}
+                    onChange={(e) => setStartPrice(e.target.value)}
+                    className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="listing-end-price" className="sr-only">
+                    End price in USDC
+                  </label>
+                  <input
+                    id="listing-end-price"
+                    type="number"
+                    step="0.01"
+                    placeholder="End (USDC)"
+                    value={endPrice}
+                    onChange={(e) => setEndPrice(e.target.value)}
+                    className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
               </div>
-              <select
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="3600">1 hour</option>
-                <option value="21600">6 hours</option>
-                <option value="86400">24 hours</option>
-                <option value="259200">3 days</option>
-                <option value="604800">7 days</option>
-              </select>
+              <div>
+                <label htmlFor="listing-duration" className="sr-only">
+                  Listing duration
+                </label>
+                <Select value={duration} onValueChange={setDuration}>
+                  <SelectTrigger id="listing-duration" className="h-9 text-xs font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3600">1 hour</SelectItem>
+                    <SelectItem value="21600">6 hours</SelectItem>
+                    <SelectItem value="86400">24 hours</SelectItem>
+                    <SelectItem value="259200">3 days</SelectItem>
+                    <SelectItem value="604800">7 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 size="sm"
                 variant="outline"
-                className="w-full gap-1"
+                className="w-full gap-1 cursor-pointer"
                 onClick={handleList}
                 disabled={busyAction === "list"}
               >
@@ -442,7 +485,7 @@ const RegionSidebar = () => {
           )
         )}
       </div>
-    </div>
+    </aside>
   );
 };
 

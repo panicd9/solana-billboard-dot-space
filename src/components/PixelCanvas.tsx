@@ -31,6 +31,20 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
+  // Keyboard navigation state
+  const [kbCursor, setKbCursor] = useState<{ col: number; row: number } | null>(null);
+  const [kbAnchor, setKbAnchor] = useState<{ col: number; row: number } | null>(null);
+
+  // Reduced motion preference
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
   const clampPan = useCallback((px: number, py: number, z: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: px, y: py };
@@ -157,23 +171,28 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     }
   }, [isDragging, isPanning]);
 
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
+  // Wheel handler — must be non-passive to call preventDefault.
+  // React's synthetic onWheel is passive by default.
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * zoomFactor));
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * zoomFactor));
+      const scale = newZoom / zoom;
+      const newPanX = mouseX - scale * (mouseX - pan.x);
+      const newPanY = mouseY - scale * (mouseY - pan.y);
 
-    const scale = newZoom / zoom;
-    const newPanX = mouseX - scale * (mouseX - pan.x);
-    const newPanY = mouseY - scale * (mouseY - pan.y);
-
-    setZoom(newZoom);
-    setPan(clampPan(newPanX, newPanY, newZoom));
+      setZoom(newZoom);
+      setPan(clampPan(newPanX, newPanY, newZoom));
+    };
+    canvas.addEventListener("wheel", handler, { passive: false });
+    return () => canvas.removeEventListener("wheel", handler);
   }, [zoom, pan, clampPan]);
 
   const resetView = useCallback(() => {
@@ -188,6 +207,55 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
   const zoomOut = useCallback(() => {
     setZoom(z => Math.max(MIN_ZOOM, z * 0.7));
   }, []);
+
+  // Keyboard navigation
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+      const moveKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+      if (moveKeys.includes(e.key)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        const cur = kbCursor ?? { col: 0, row: 0 };
+        let { col, row } = cur;
+        if (e.key === "ArrowUp") row = Math.max(0, row - step);
+        if (e.key === "ArrowDown") row = Math.min(GRID_ROWS - 1, row + step);
+        if (e.key === "ArrowLeft") col = Math.max(0, col - step);
+        if (e.key === "ArrowRight") col = Math.min(GRID_COLS - 1, col + step);
+        setKbCursor({ col, row });
+        return;
+      }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (!kbCursor) {
+          setKbCursor({ col: 0, row: 0 });
+          return;
+        }
+        if (kbAnchor) {
+          const sel = normalizeSelection(kbAnchor, kbCursor);
+          if (!hasOverlap(sel)) onSelectionChange(sel);
+          setKbAnchor(null);
+        } else {
+          const region = getRegionAt(kbCursor.col, kbCursor.row);
+          if (region) {
+            onRegionClick(region);
+          } else {
+            setKbAnchor(kbCursor);
+          }
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setKbAnchor(null);
+        if (selection) onSelectionChange(null);
+        else setKbCursor(null);
+      }
+    },
+    [kbCursor, kbAnchor, normalizeSelection, hasOverlap, onSelectionChange, getRegionAt, onRegionClick, selection]
+  );
+
+  // Detect whether any animated boost is visible
+  const hasAnimatedBoost = !reducedMotion && regions.some((r) => r.isHighlighted || r.hasGlowBorder);
 
   // Draw loop
   useEffect(() => {
@@ -228,14 +296,12 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         const czW = CENTER_ZONE_WIDTH * BLOCK_SIZE;
         const czH = CENTER_ZONE_HEIGHT * BLOCK_SIZE;
 
-        // Dim the outer zone
         ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-        ctx.fillRect(0, 0, CANVAS_W, czY); // top
-        ctx.fillRect(0, czY, czX, czH); // left
-        ctx.fillRect(czX + czW, czY, CANVAS_W - czX - czW, czH); // right
-        ctx.fillRect(0, czY + czH, CANVAS_W, CANVAS_H - czY - czH); // bottom
+        ctx.fillRect(0, 0, CANVAS_W, czY);
+        ctx.fillRect(0, czY, czX, czH);
+        ctx.fillRect(czX + czW, czY, CANVAS_W - czX - czW, czH);
+        ctx.fillRect(0, czY + czH, CANVAS_W, CANVAS_H - czY - czH);
 
-        // Highlight center zone
         ctx.fillStyle = "rgba(255, 200, 55, 0.10)";
         ctx.fillRect(czX, czY, czW, czH);
         ctx.strokeStyle = "rgba(255, 200, 55, 0.6)";
@@ -244,7 +310,6 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.strokeRect(czX, czY, czW, czH);
         ctx.setLineDash([]);
 
-        // Label
         const label = "Center Zone — 0.12 USDC/block";
         const fontSize = 18 / zoom;
         ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
@@ -256,7 +321,6 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.fillStyle = "rgba(255, 200, 55, 0.95)";
         ctx.fillText(label, lx, ly);
 
-        // Outer zone label
         const outerLabel = "Outer Zone — bonding curve 0.01–0.10 USDC";
         const outerFontSize = 16 / zoom;
         ctx.font = `bold ${outerFontSize}px 'Space Grotesk', sans-serif`;
@@ -269,7 +333,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.fillText(outerLabel, olx, oly);
       }
 
-      // Render occupied blocks from bitmap (visible even if region objects didn't load)
+      // Render occupied blocks from bitmap
       if (occupancy.size > 0) {
         ctx.fillStyle = "rgba(100, 70, 180, 0.3)";
         for (const key of occupancy) {
@@ -292,11 +356,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         if (img) {
           ctx.drawImage(img, rx, ry, rw, rh);
         } else {
-          // Solid fill for claimed regions without an image
           ctx.fillStyle = "rgba(100, 70, 180, 0.25)";
           ctx.fillRect(rx, ry, rw, rh);
 
-          // Diagonal hatching pattern to make them clearly "taken"
           ctx.save();
           ctx.beginPath();
           ctx.rect(rx, ry, rw, rh);
@@ -312,7 +374,6 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           }
           ctx.restore();
 
-          // Owner label centered in region
           const label = `${region.owner.slice(0, 4)}..${region.owner.slice(-4)}`;
           const fontSize = Math.min(20, Math.min(rw, rh) * 0.6);
           if (fontSize >= 4) {
@@ -327,19 +388,16 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           }
         }
 
-        // Highlight boost (permanent on-chain)
+        // Highlight boost — pulsing inner glow
         if (region.isHighlighted) {
-          const hPulse = 0.5 + 0.5 * Math.sin(now / 400);
-          // Inset pulses between 15% and 35% of region size
+          const hPulse = reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 400);
           const inset = Math.max(rw, rh) * (0.15 + hPulse * 0.20);
           const glowAlpha = 0.2 + hPulse * 0.2;
 
-          // Color shifts between #4284DB and #29EAC4
           const r = Math.round(66 + (41 - 66) * hPulse);
           const g = Math.round(132 + (234 - 132) * hPulse);
           const b = Math.round(219 + (196 - 219) * hPulse);
 
-          // Pulsing inner shadow — four edge gradients
           ctx.save();
           ctx.beginPath();
           ctx.rect(rx, ry, rw, rh);
@@ -371,7 +429,6 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
           ctx.restore();
 
-          // Border stroke with smaller glow
           ctx.save();
           ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${0.4 + hPulse * 0.3})`;
           ctx.shadowBlur = (8 + hPulse * 8) / zoom;
@@ -381,22 +438,20 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           ctx.restore();
         }
 
-        // Glow boost (permanent on-chain) — rotating snake border
+        // Glow boost — rotating snake border (static when reduced motion)
         if (region.hasGlowBorder) {
           const perimeter = 2 * (rw + rh);
           const snakeLen = perimeter * 0.3;
           const gapLen = perimeter - snakeLen;
-          const speed = now * 0.08;
+          const speed = reducedMotion ? 0 : now * 0.08;
           const dashOffset = -(speed % perimeter);
 
-          // Dim base border so the full outline is faintly visible
           ctx.save();
           ctx.strokeStyle = "rgba(153, 69, 255, 0.2)";
           ctx.lineWidth = 2 / zoom;
           ctx.strokeRect(rx, ry, rw, rh);
           ctx.restore();
 
-          // Bright snake segment with glow
           ctx.save();
           ctx.shadowColor = "rgba(153, 69, 255, 0.9)";
           ctx.shadowBlur = 14 / zoom;
@@ -408,30 +463,30 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           ctx.setLineDash([]);
           ctx.restore();
 
-          // Second pass — white-hot core for the snake head area
-          ctx.save();
-          const headLen = snakeLen * 0.15;
-          ctx.strokeStyle = "rgba(200, 170, 255, 0.7)";
-          ctx.lineWidth = 1.5 / zoom;
-          ctx.setLineDash([headLen, perimeter - headLen]);
-          ctx.lineDashOffset = dashOffset;
-          ctx.strokeRect(rx, ry, rw, rh);
-          ctx.setLineDash([]);
-          ctx.restore();
+          if (!reducedMotion) {
+            ctx.save();
+            const headLen = snakeLen * 0.15;
+            ctx.strokeStyle = "rgba(200, 170, 255, 0.7)";
+            ctx.lineWidth = 1.5 / zoom;
+            ctx.setLineDash([headLen, perimeter - headLen]);
+            ctx.lineDashOffset = dashOffset;
+            ctx.strokeRect(rx, ry, rw, rh);
+            ctx.setLineDash([]);
+            ctx.restore();
+          }
         } else {
           ctx.strokeStyle = region.isListed ? "rgba(255, 200, 50, 0.7)" : "rgba(100, 70, 180, 0.6)";
           ctx.lineWidth = 1.5 / zoom;
           ctx.strokeRect(rx, ry, rw, rh);
         }
 
-        // Trending indicator (permanent on-chain)
         if (region.isTrending) {
           ctx.fillStyle = "rgba(255, 140, 0, 0.9)";
           ctx.fillRect(rx, ry, 6, 6);
         }
       }
 
-      // Hover highlight
+      // Hover highlight (mouse)
       if (hoveredBlock && !isDragging && !isOccupied(hoveredBlock.col, hoveredBlock.row)) {
         ctx.fillStyle = "rgba(0, 224, 255, 0.15)";
         ctx.fillRect(hoveredBlock.col * BLOCK_SIZE, hoveredBlock.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
@@ -440,13 +495,29 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.strokeRect(hoveredBlock.col * BLOCK_SIZE, hoveredBlock.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
       }
 
-      // Hover on occupied block
       if (hoveredBlock && isOccupied(hoveredBlock.col, hoveredBlock.row)) {
         const region = getRegionAt(hoveredBlock.col, hoveredBlock.row);
         if (region) {
           ctx.strokeStyle = "rgba(0, 224, 255, 0.8)";
           ctx.lineWidth = 2 / zoom;
           ctx.strokeRect(region.startX * BLOCK_SIZE, region.startY * BLOCK_SIZE, region.width * BLOCK_SIZE, region.height * BLOCK_SIZE);
+        }
+      }
+
+      // Keyboard cursor + anchored selection preview
+      if (kbCursor) {
+        if (kbAnchor) {
+          const sel = normalizeSelection(kbAnchor, kbCursor);
+          const overlap = hasOverlap(sel);
+          ctx.fillStyle = overlap ? "rgba(220, 50, 50, 0.25)" : "rgba(0, 224, 255, 0.20)";
+          ctx.fillRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
+          ctx.strokeStyle = overlap ? "rgba(220, 50, 50, 0.8)" : "rgba(0, 224, 255, 0.8)";
+          ctx.lineWidth = 2 / zoom;
+          ctx.strokeRect(sel.col * BLOCK_SIZE, sel.row * BLOCK_SIZE, sel.width * BLOCK_SIZE, sel.height * BLOCK_SIZE);
+        } else {
+          ctx.strokeStyle = "rgba(0, 224, 255, 0.9)";
+          ctx.lineWidth = 2 / zoom;
+          ctx.strokeRect(kbCursor.col * BLOCK_SIZE, kbCursor.row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         }
       }
 
@@ -482,13 +553,29 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.strokeRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
         ctx.setLineDash([]);
       }
-
-      animRef.current = requestAnimationFrame(draw);
     };
 
-    animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [regions, occupancy, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd, selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan, showPricingOverlay]);
+    // Always draw at least once on state change
+    draw();
+
+    // Loop only when something is animating (boosts) or actively dragging
+    if (hasAnimatedBoost || isDragging) {
+      const tick = () => {
+        draw();
+        animRef.current = requestAnimationFrame(tick);
+      };
+      animRef.current = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(animRef.current);
+    }
+  }, [
+    regions, occupancy, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd,
+    selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan,
+    showPricingOverlay, kbCursor, kbAnchor, hasAnimatedBoost, reducedMotion,
+  ]);
+
+  const cursorLabel = kbCursor
+    ? `Cursor at column ${kbCursor.col}, row ${kbCursor.row}${kbAnchor ? ", selecting" : ""}`
+    : "";
 
   return (
     <div ref={containerRef} className="relative flex-1 overflow-hidden flex items-center justify-center bg-background p-2">
@@ -496,27 +583,50 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ref={canvasRef}
         width={CANVAS_W}
         height={CANVAS_H}
-        className={`max-w-full max-h-full border border-border rounded-sm ${isPanning ? "cursor-grabbing" : "cursor-crosshair"}`}
+        role="application"
+        aria-label="Pixel canvas grid. Drag with mouse to select a region, or use arrow keys to move the cursor and Enter to start or finish a selection. Press Escape to cancel."
+        tabIndex={0}
+        className={`max-w-full max-h-full border border-border rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isPanning ? "cursor-grabbing" : "cursor-crosshair"}`}
         style={{ imageRendering: "pixelated" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        onWheel={handleWheel}
+        onKeyDown={handleKeyDown}
       />
+
+      {/* Live region for screen reader keyboard feedback */}
+      <div className="sr-only" aria-live="polite">{cursorLabel}</div>
 
       {/* Zoom controls */}
       <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-card/90 border border-border rounded-md backdrop-blur-sm p-1">
-        <button onClick={zoomOut} className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground" title="Zoom out">
-          <ZoomOut className="w-4 h-4" />
+        <button
+          type="button"
+          onClick={zoomOut}
+          className="cursor-pointer p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Zoom out"
+        >
+          <ZoomOut className="w-4 h-4" aria-hidden="true" />
         </button>
-        <span className="text-xs font-mono text-muted-foreground w-12 text-center">{Math.round(zoom * 100)}%</span>
-        <button onClick={zoomIn} className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground" title="Zoom in">
-          <ZoomIn className="w-4 h-4" />
+        <span className="text-xs font-mono text-muted-foreground w-12 text-center" aria-live="polite">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          onClick={zoomIn}
+          className="cursor-pointer p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Zoom in"
+        >
+          <ZoomIn className="w-4 h-4" aria-hidden="true" />
         </button>
         <div className="w-px h-4 bg-border" />
-        <button onClick={resetView} className="p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground" title="Reset view">
-          <Maximize className="w-4 h-4" />
+        <button
+          type="button"
+          onClick={resetView}
+          className="cursor-pointer p-1.5 hover:bg-muted rounded transition-colors text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Reset view"
+        >
+          <Maximize className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
 

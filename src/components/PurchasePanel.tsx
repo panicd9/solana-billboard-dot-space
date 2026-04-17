@@ -115,32 +115,41 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
   if (collapsed) {
     return (
       <button
+        type="button"
         onClick={onToggleCollapse}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-card/95 backdrop-blur-md border border-border border-r-0 rounded-l-lg p-2 text-muted-foreground hover:text-foreground transition-colors"
-        title="Show purchase panel"
+        className="cursor-pointer absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-card/95 backdrop-blur-md border border-border border-r-0 rounded-l-lg p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label="Show purchase panel"
+        aria-expanded={false}
       >
-        <ChevronRight className="w-4 h-4 rotate-180" />
+        <ChevronRight className="w-4 h-4 rotate-180" aria-hidden="true" />
       </button>
     );
   }
 
   return (
-    <div className="w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto shrink-0">
+    <aside
+      aria-label="Purchase region panel"
+      className="w-full sm:w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto shrink-0"
+    >
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground">Purchase Region</h3>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={onToggleCollapse}
-            className="text-muted-foreground hover:text-foreground p-0.5"
-            title="Hide panel"
+            className="cursor-pointer text-muted-foreground hover:text-foreground p-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Hide panel"
+            aria-expanded={true}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground p-0.5"
+            className="cursor-pointer text-muted-foreground hover:text-foreground p-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Close purchase panel"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -175,11 +184,13 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
               <div className="flex items-center gap-1.5">
                 <span className="text-foreground">Total</span>
                 <button
+                  type="button"
                   onClick={onTogglePricingOverlay}
-                  className={`p-0.5 rounded transition-colors ${showPricingOverlay ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  title="How pricing works"
+                  className={`cursor-pointer p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${showPricingOverlay ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  aria-label="How pricing works"
+                  aria-pressed={showPricingOverlay}
                 >
-                  <HelpCircle className="w-3.5 h-3.5" />
+                  <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
               <span className="text-accent">{price?.display ?? "..."} USDC</span>
@@ -195,10 +206,14 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
 
       {/* Image preview section */}
       <div className="p-4 space-y-3 border-b border-border">
-        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+        <label
+          htmlFor="purchase-image-file"
+          className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider"
+        >
           Image Preview (optional)
-        </p>
+        </label>
         <input
+          id="purchase-image-file"
           ref={fileRef}
           type="file"
           accept="image/*"
@@ -236,6 +251,7 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
                 </div>
                 {ratioMatch !== null && (
                   <div
+                    role="status"
                     className={`flex items-center gap-1.5 text-xs px-2 py-1.5 rounded ${
                       ratioMatch < 0.1
                         ? "bg-green-500/10 text-green-400"
@@ -246,17 +262,18 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
                   >
                     {ratioMatch < 0.1 ? (
                       <>
-                        <CheckCircle className="w-3.5 h-3.5 shrink-0" /> Good aspect ratio match
+                        <CheckCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        Good match ({Math.round(ratioMatch * 100)}% off)
                       </>
                     ) : ratioMatch < 0.3 ? (
                       <>
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Slight stretch — consider
-                        adjusting
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        Slight stretch ({Math.round(ratioMatch * 100)}% off)
                       </>
                     ) : (
                       <>
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Image will be stretched
-                        significantly
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        Heavy stretch ({Math.round(ratioMatch * 100)}% off)
                       </>
                     )}
                   </div>
@@ -293,15 +310,19 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
 
       {/* Link input */}
       <div className="p-4 space-y-2 border-b border-border">
-        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+        <label
+          htmlFor="purchase-link"
+          className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider"
+        >
           Link (optional)
-        </p>
+        </label>
         <input
+          id="purchase-link"
           type="url"
           placeholder="https://..."
           value={linkValue}
           onChange={(e) => setLinkValue(e.target.value)}
-          className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
 
@@ -326,7 +347,7 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
           )}
         </Button>
       </div>
-    </div>
+    </aside>
   );
 };
 
