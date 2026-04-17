@@ -25,7 +25,7 @@ export const BOOSTS_SEED = Buffer.from("boosts");
 export const USDC_DECIMALS = 6;
 
 // Must match programs/solana-space/src/constants.rs
-export const FEE_BPS = 250n;
+export const FEE_BPS = 400n;
 export const BPS_DENOM = 10_000n;
 export const CURVE_START_PRICE = 10_000n;
 export const CENTER_PRICE_PER_BLOCK = 120_000n;

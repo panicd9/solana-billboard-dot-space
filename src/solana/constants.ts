@@ -36,7 +36,7 @@ export const BOOST_PRICE_HIGHLIGHTED = 1_000_000n; // 1 USDC
 export const BOOST_PRICE_GLOWING = 2_000_000n; // 2 USDC
 export const BOOST_PRICE_TRENDING = 5_000_000n; // 5 USDC
 
-// Marketplace fee: 2.5% (250 basis points)
-export const MARKETPLACE_FEE_BPS = 250;
+// Marketplace fee: 4% (400 basis points)
+export const MARKETPLACE_FEE_BPS = 400;
 
 export const USDC_DECIMALS = 6;

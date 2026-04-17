@@ -57,6 +57,6 @@ pub const BOOST_PRICE_TRENDING: u64 = 5_000_000; // 5 USDC
 #[constant]
 pub const LISTING_SEED: &[u8] = b"listing";
 
-// Treasury fee: 2.5% = 250 basis points
-pub const MARKETPLACE_FEE_BPS: u64 = 250;
+// Treasury fee: 4% = 400 basis points
+pub const MARKETPLACE_FEE_BPS: u64 = 400;
 pub const BPS_DENOMINATOR: u64 = 10_000;
