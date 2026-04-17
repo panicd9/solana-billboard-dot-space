@@ -29,6 +29,9 @@ pub enum ErrorCode {
     #[msg("Invalid USDC mint address")]
     InvalidUsdcMint,
 
+    #[msg("Invalid treasury USDC account")]
+    InvalidTreasury,
+
     #[msg("Arithmetic overflow in price calculation")]
     ArithmeticOverflow,
 

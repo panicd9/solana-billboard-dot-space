@@ -93,6 +93,10 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
             ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
             ErrorCode::InvalidUsdcMint
         );
+        require!(
+            ctx.accounts.treasury_usdc_ata.owner == canvas_state.treasury,
+            ErrorCode::InvalidTreasury
+        );
     }
 
     // 3. Validate asset belongs to collection by reading raw bytes.

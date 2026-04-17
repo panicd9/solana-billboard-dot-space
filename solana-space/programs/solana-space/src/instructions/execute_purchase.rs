@@ -54,6 +54,7 @@ pub struct ExecutePurchase<'info> {
     #[account(
         mut,
         token::mint = usdc_mint,
+        token::authority = seller,
     )]
     pub seller_usdc_ata: InterfaceAccount<'info, TokenAccount>,
 
@@ -85,6 +86,10 @@ pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
         require!(
             ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
             ErrorCode::InvalidUsdcMint
+        );
+        require!(
+            ctx.accounts.treasury_usdc_ata.owner == canvas_state.treasury,
+            ErrorCode::InvalidTreasury
         );
     }
 

@@ -174,6 +174,10 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
             ErrorCode::InvalidUsdcMint
         );
         require!(
+            ctx.accounts.treasury_usdc_ata.owner == canvas_state.treasury,
+            ErrorCode::InvalidTreasury
+        );
+        require!(
             canvas_state.is_region_free(args.x, args.y, args.width, args.height),
             ErrorCode::RegionOccupied
         );
