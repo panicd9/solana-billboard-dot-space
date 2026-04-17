@@ -1,4 +1,5 @@
-import { Grid, Tag } from "lucide-react";
+import { Grid, Tag, Activity as ActivityIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
@@ -74,6 +75,18 @@ const CanvasToolbar = ({ view, onViewChange }: Props) => {
           Market
         </Button>
         </div>
+
+        <Button
+          asChild
+          size="sm"
+          variant="ghost"
+          className="cursor-pointer gap-1.5 text-xs h-7 px-3 text-muted-foreground hover:text-foreground"
+        >
+          <Link to="/activity" aria-label="View recent activity">
+            <ActivityIcon className="w-3.5 h-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Activity</span>
+          </Link>
+        </Button>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
