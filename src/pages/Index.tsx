@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { type Selection, type Region } from "@/types/region";
-import { RegionProvider, useRegions } from "@/context/RegionContext";
+import { useRegions } from "@/context/RegionContext";
 import PixelCanvas from "@/components/PixelCanvas";
 import CanvasToolbar from "@/components/CanvasToolbar";
 import PurchasePanel from "@/components/PurchasePanel";
@@ -10,7 +10,7 @@ import TrendingSidebar from "@/components/TrendingSidebar";
 
 const HERO_KEY = "billboard:hero-dismissed";
 
-const IndexInner = () => {
+const Index = () => {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [view, setView] = useState<"canvas" | "marketplace">("canvas");
   const [purchasePanelOpen, setPurchasePanelOpen] = useState(false);
@@ -104,11 +104,5 @@ const IndexInner = () => {
     </div>
   );
 };
-
-const Index = () => (
-  <RegionProvider>
-    <IndexInner />
-  </RegionProvider>
-);
 
 export default Index;

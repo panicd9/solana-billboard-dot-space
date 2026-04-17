@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   X,
   ExternalLink,
@@ -12,6 +13,7 @@ import {
   TrendingUp,
   Loader2,
   Info,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -202,17 +204,22 @@ const RegionSidebar = () => {
       )}
 
       <div className="p-4 space-y-3 text-sm font-mono">
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Owner</span>
-          <a
-            href={`https://solscan.io/account/${r.owner}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-            title={r.owner}
-          >
-            {shortOwner}
-          </a>
+          <div className="flex items-center gap-1.5">
+            {r.owner && (
+              <RouterLink
+                to={`/u/${r.owner}`}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+                title="View profile"
+                aria-label={`View profile for ${r.owner}`}
+              >
+                <User className="w-3 h-3" aria-hidden="true" />
+                {shortOwner}
+              </RouterLink>
+            )}
+            {!r.owner && <span className="text-muted-foreground">{shortOwner}</span>}
+          </div>
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Position</span>
