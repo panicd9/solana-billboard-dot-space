@@ -10,6 +10,7 @@ import {
 import { GRID_COLS, GRID_ROWS, type Region, type Selection } from "@/types/region";
 import { useCanvasState } from "@/hooks/useCanvasState";
 import { useOnChainRegions } from "@/hooks/useOnChainRegions";
+import { useAnimatedImages, type AnimatedImage } from "@/hooks/useAnimatedImages";
 import {
   useMintRegion,
   useUpdateRegionImage,
@@ -48,6 +49,7 @@ interface RegionContextType {
   calculatePrice: (sel: Selection) => { lamports: bigint; display: string };
   trendingRegions: Region[];
   loadedImages: Map<string, HTMLImageElement>;
+  animatedImages: Map<string, AnimatedImage>;
   isLoading: boolean;
   error: Error | null;
 }
@@ -82,6 +84,8 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
     () => canvasState.data?.occupiedBlocks ?? new Set<string>(),
     [canvasState.data?.occupiedBlocks]
   );
+
+  const animatedImages = useAnimatedImages(regions);
 
   // Preload images for canvas rendering
   useEffect(() => {
@@ -327,6 +331,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         calculatePrice,
         trendingRegions,
         loadedImages,
+        animatedImages,
         isLoading,
         error,
       }}

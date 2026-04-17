@@ -19,7 +19,7 @@ const MAX_ZOOM = 5;
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, isLoading } = useRegions();
+  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isLoading } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ col: number; row: number } | null>(null);
@@ -258,6 +258,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
   // Detect whether any animated boost is visible
   const hasAnimatedBoost = !reducedMotion && regions.some((r) => r.isHighlighted || r.hasGlowBorder);
+  // Detect whether any animated GIF region is present
+  const hasAnimatedGif = !reducedMotion && animatedImages.size > 0;
 
   // Draw loop
   useEffect(() => {
@@ -354,8 +356,21 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         const rw = region.width * BLOCK_SIZE;
         const rh = region.height * BLOCK_SIZE;
 
+        const anim = animatedImages.get(region.id);
         const img = loadedImages.get(region.id);
-        if (img) {
+        if (anim) {
+          // Pick active frame based on wall-clock time modulo total duration.
+          // For reduced-motion, always show the first frame.
+          let frameIdx = 0;
+          if (!reducedMotion && anim.totalDuration > 0) {
+            let t = now % anim.totalDuration;
+            for (let i = 0; i < anim.delays.length; i++) {
+              if (t < anim.delays[i]) { frameIdx = i; break; }
+              t -= anim.delays[i];
+            }
+          }
+          ctx.drawImage(anim.frames[frameIdx], rx, ry, rw, rh);
+        } else if (img) {
           ctx.drawImage(img, rx, ry, rw, rh);
         } else {
           ctx.fillStyle = "rgba(100, 70, 180, 0.25)";
@@ -560,8 +575,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     // Always draw at least once on state change
     draw();
 
-    // Loop only when something is animating (boosts) or actively dragging
-    if (hasAnimatedBoost || isDragging) {
+    // Loop only when something is animating (boosts, GIFs) or actively dragging
+    if (hasAnimatedBoost || hasAnimatedGif || isDragging) {
       const tick = () => {
         draw();
         animRef.current = requestAnimationFrame(tick);
@@ -570,9 +585,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
       return () => cancelAnimationFrame(animRef.current);
     }
   }, [
-    regions, occupancy, loadedImages, hoveredBlock, isDragging, dragStart, dragEnd,
+    regions, occupancy, loadedImages, animatedImages, hoveredBlock, isDragging, dragStart, dragEnd,
     selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan,
-    showPricingOverlay, kbCursor, kbAnchor, hasAnimatedBoost, reducedMotion,
+    showPricingOverlay, kbCursor, kbAnchor, hasAnimatedBoost, hasAnimatedGif, reducedMotion,
   ]);
 
   const cursorLabel = kbCursor
