@@ -8,6 +8,7 @@ import SolanaProvider from "@/components/SolanaProvider";
 import { RegionProvider } from "@/context/RegionContext";
 import Index from "./pages/Index";
 import Profile from "./pages/Profile";
+import Embed from "./pages/Embed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/u/:wallet" element={<Profile />} />
+              <Route path="/embed/r/:assetId" element={<Embed />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </RegionProvider>

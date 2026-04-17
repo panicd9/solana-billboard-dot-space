@@ -14,6 +14,7 @@ import {
   Loader2,
   Info,
   User,
+  Code2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -260,15 +261,34 @@ const RegionSidebar = () => {
         )}
 
         {!isBitmapOnly && (
-          <a
-            href={`https://solscan.io/account/${r.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-primary hover:underline"
-          >
-            <ExternalLink className="w-3 h-3" />
-            View on Solscan
-          </a>
+          <div className="flex items-center gap-3 flex-wrap">
+            <a
+              href={`https://solscan.io/account/${r.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              View on Solscan
+            </a>
+            <button
+              type="button"
+              onClick={async () => {
+                const embed = `<iframe src="${window.location.origin}/embed/r/${r.id}" width="320" height="180" frameborder="0" style="border:0;border-radius:8px"></iframe>`;
+                try {
+                  await navigator.clipboard.writeText(embed);
+                  toast.success("Embed code copied");
+                } catch {
+                  toast.error("Couldn't copy");
+                }
+              }}
+              className="cursor-pointer flex items-center gap-1 text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              aria-label="Copy embed code"
+            >
+              <Code2 className="w-3 h-3" />
+              Copy embed
+            </button>
+          </div>
         )}
         {isBitmapOnly && (
           <p className="text-xs text-muted-foreground italic">

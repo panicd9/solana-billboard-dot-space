@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { type Selection, type Region } from "@/types/region";
 import { useRegions } from "@/context/RegionContext";
 import PixelCanvas from "@/components/PixelCanvas";
@@ -20,7 +21,22 @@ const Index = () => {
   const [heroDismissed, setHeroDismissed] = useState(() => {
     try { return localStorage.getItem(HERO_KEY) === "1"; } catch { return false; }
   });
-  const { setSelectedRegion, selectedRegion } = useRegions();
+  const { setSelectedRegion, selectedRegion, regions } = useRegions();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Deep-link: /?region=<assetId> opens that region once regions load.
+  useEffect(() => {
+    const wanted = searchParams.get("region");
+    if (!wanted) return;
+    const match = regions.find((r) => r.id === wanted);
+    if (match) {
+      setSelectedRegion(match);
+      setView("canvas");
+      const next = new URLSearchParams(searchParams);
+      next.delete("region");
+      setSearchParams(next, { replace: true });
+    }
+  }, [regions, searchParams, setSelectedRegion, setSearchParams]);
 
   const handleDismissHero = useCallback(() => {
     setHeroDismissed(true);
