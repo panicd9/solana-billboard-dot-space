@@ -157,9 +157,9 @@ const RegionSidebar = () => {
   return (
     <aside
       aria-label="Region details panel"
-      className="w-full sm:w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto"
+      className="w-full sm:w-72 bg-gradient-to-b from-card via-card to-card/80 border-l border-border flex flex-col h-full overflow-y-auto"
     >
-      <div className="flex items-center justify-between p-4 border-b border-border">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
         <h3 className="text-sm font-semibold text-foreground">Region Details</h3>
         <button
           type="button"
@@ -178,6 +178,26 @@ const RegionSidebar = () => {
             alt="Region"
             className="w-full rounded border border-border object-contain"
           />
+        </div>
+      )}
+
+      {(r.isHighlighted || r.hasGlowBorder || r.isTrending) && (
+        <div className="px-4 pt-3 pb-1 flex flex-wrap gap-1.5">
+          {r.isHighlighted && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 shadow-[0_0_8px_rgba(41,234,196,0.25)]">
+              <Sparkles className="w-2.5 h-2.5" aria-hidden="true" /> Highlighted
+            </span>
+          )}
+          {r.hasGlowBorder && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-400/30 shadow-[0_0_8px_rgba(153,69,255,0.3)]">
+              <Zap className="w-2.5 h-2.5" aria-hidden="true" /> Glowing
+            </span>
+          )}
+          {r.isTrending && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30 shadow-[0_0_8px_rgba(255,140,0,0.25)]">
+              <TrendingUp className="w-2.5 h-2.5" aria-hidden="true" /> Trending
+            </span>
+          )}
         </div>
       )}
 

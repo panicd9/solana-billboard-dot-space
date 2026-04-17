@@ -2,22 +2,24 @@ import { useRef, useEffect, useState, useCallback, memo } from "react";
 import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, type Selection, type Region } from "@/types/region";
 import { CENTER_ZONE_X, CENTER_ZONE_Y, CENTER_ZONE_WIDTH, CENTER_ZONE_HEIGHT } from "@/solana/constants";
 import { useRegions } from "@/context/RegionContext";
-import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, MousePointer2, Coins, X, Loader2 } from "lucide-react";
 
 interface Props {
   selection: Selection | null;
   onSelectionChange: (sel: Selection | null) => void;
   onRegionClick: (region: Region) => void;
   showPricingOverlay?: boolean;
+  heroDismissed: boolean;
+  onDismissHero: () => void;
 }
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
 
-const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay }: Props) => {
+const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages } = useRegions();
+  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, isLoading } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ col: number; row: number } | null>(null);
@@ -577,6 +579,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     ? `Cursor at column ${kbCursor.col}, row ${kbCursor.row}${kbAnchor ? ", selecting" : ""}`
     : "";
 
+  const showLoading = isLoading && regions.length === 0 && occupancy.size === 0;
+  const showHero = !showLoading && !heroDismissed && !selection && !isDragging && !kbCursor;
+
   return (
     <div ref={containerRef} className="relative flex-1 overflow-hidden flex items-center justify-center bg-background p-2">
       <canvas
@@ -597,6 +602,54 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
       {/* Live region for screen reader keyboard feedback */}
       <div className="sr-only" aria-live="polite">{cursorLabel}</div>
+
+      {/* Loading state — initial chain fetch */}
+      {showLoading && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none p-4"
+          aria-live="polite"
+        >
+          <div className="bg-card/85 backdrop-blur-md border border-border rounded-xl shadow-2xl shadow-primary/10 px-5 py-4 text-center flex items-center gap-3">
+            <Loader2 className="w-5 h-5 text-primary animate-spin" aria-hidden="true" />
+            <div className="text-left">
+              <p className="text-sm font-semibold text-foreground">Loading the billboard…</p>
+              <p className="text-xs text-muted-foreground">Fetching regions from Solana</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hero / empty-state callout */}
+      {showHero && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none p-4 animate-in fade-in duration-500"
+          aria-hidden="true"
+        >
+          <div className="pointer-events-auto max-w-sm w-full bg-card/85 backdrop-blur-md border border-border rounded-xl shadow-2xl shadow-primary/10 p-5 text-center relative">
+            <button
+              type="button"
+              onClick={onDismissHero}
+              className="cursor-pointer absolute top-2 right-2 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-3 rounded-full bg-primary/10 text-primary">
+              <MousePointer2 className="w-6 h-6" aria-hidden="true" />
+            </div>
+            <h2 className="text-base font-semibold text-foreground mb-1.5">
+              Click and drag to claim pixels
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Select any empty area on the canvas, upload an image, and own a piece of the billboard forever.
+            </p>
+            <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-mono text-accent bg-accent/10 px-2.5 py-1 rounded-full">
+              <Coins className="w-3 h-3" aria-hidden="true" />
+              From 0.01 USDC per block
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zoom controls */}
       <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-card/90 border border-border rounded-md backdrop-blur-sm p-1">

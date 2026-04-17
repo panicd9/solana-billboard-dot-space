@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
-import { ArrowUpDown, MapPin, Search } from "lucide-react";
+import { ArrowUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRegions } from "@/context/RegionContext";
 import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import RegionMiniMap from "@/components/RegionMiniMap";
 
 interface Props {
   onHighlightRegion: (regionId: string) => void;
@@ -150,23 +151,28 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                       <div className="text-muted-foreground text-xs font-mono">No image</div>
                     )}
                   </div>
-                  <div className="p-3 space-y-1.5 text-xs font-mono">
-                    <div className="flex justify-between">
+                  <div className="p-3 space-y-2 text-xs font-mono">
+                    <div className="flex items-center gap-2">
+                      <RegionMiniMap
+                        startX={r.startX}
+                        startY={r.startY}
+                        width={r.width}
+                        height={r.height}
+                        className="w-16 h-9 rounded border border-border shrink-0"
+                      />
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="text-foreground">
+                          ({r.startX},{r.startY})
+                        </div>
+                        <div className="text-primary">
+                          {r.width}×{r.height} <span className="text-muted-foreground">({r.width * r.height})</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-border">
                       <span className="text-muted-foreground">Owner</span>
                       <span className="text-foreground">
                         {r.owner.slice(0, 4)}...{r.owner.slice(-4)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Position</span>
-                      <span className="text-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" aria-hidden="true" />({r.startX},{r.startY})
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Size</span>
-                      <span className="text-primary">
-                        {r.width}x{r.height} ({r.width * r.height})
                       </span>
                     </div>
                     <div className="flex justify-between">

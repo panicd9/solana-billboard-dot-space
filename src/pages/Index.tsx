@@ -8,6 +8,8 @@ import RegionSidebar from "@/components/RegionSidebar";
 import MarketplaceView from "@/components/MarketplaceView";
 import TrendingSidebar from "@/components/TrendingSidebar";
 
+const HERO_KEY = "billboard:hero-dismissed";
+
 const IndexInner = () => {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [view, setView] = useState<"canvas" | "marketplace">("canvas");
@@ -15,7 +17,15 @@ const IndexInner = () => {
   const [purchasePanelCollapsed, setPurchasePanelCollapsed] = useState(false);
   const [trendingCollapsed, setTrendingCollapsed] = useState(false);
   const [showPricingOverlay, setShowPricingOverlay] = useState(false);
+  const [heroDismissed, setHeroDismissed] = useState(() => {
+    try { return localStorage.getItem(HERO_KEY) === "1"; } catch { return false; }
+  });
   const { setSelectedRegion, selectedRegion } = useRegions();
+
+  const handleDismissHero = useCallback(() => {
+    setHeroDismissed(true);
+    try { localStorage.setItem(HERO_KEY, "1"); } catch { /* ignore */ }
+  }, []);
 
   const handleRegionClick = useCallback(
     (region: Region) => {
@@ -68,6 +78,8 @@ const IndexInner = () => {
                 onSelectionChange={handleSelectionChange}
                 onRegionClick={handleRegionClick}
                 showPricingOverlay={showPricingOverlay}
+                heroDismissed={heroDismissed}
+                onDismissHero={handleDismissHero}
               />
             </div>
             {purchasePanelOpen && !selectedRegion && (

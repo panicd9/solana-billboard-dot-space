@@ -129,9 +129,9 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
   return (
     <aside
       aria-label="Purchase region panel"
-      className="w-full sm:w-72 bg-card border-l border-border flex flex-col h-full overflow-y-auto shrink-0"
+      className="w-full sm:w-72 bg-gradient-to-b from-card via-card to-card/80 border-l border-border flex flex-col h-full overflow-y-auto shrink-0"
     >
-      <div className="flex items-center justify-between p-4 border-b border-border">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
         <h3 className="text-sm font-semibold text-foreground">Purchase Region</h3>
         <div className="flex items-center gap-1">
           <button
