@@ -239,6 +239,90 @@ export async function fetchCoreAssetsByAddresses(addresses: Address[]) {
   });
 }
 
+/**
+ * DAS shape returned by getAssetsByGroup for MPL Core collections. We only
+ * read the fields we need — the real response is much larger.
+ */
+interface DasAsset {
+  id: string;
+  ownership?: { owner?: string };
+  plugins?: {
+    attributes?: {
+      data?: {
+        attribute_list?: Array<{ key: string; value: string }>;
+      };
+    };
+  };
+}
+
+export interface DasRegionRow {
+  address: string;
+  owner: string;
+  attributes: Array<{ key: string; value: string }>;
+}
+
+/**
+ * Fetch all Core assets in a collection via the Metaplex DAS API
+ * (`getAssetsByGroup`). Requires a DAS-compatible RPC endpoint (Helius,
+ * Triton, Shyft). Response is indexed, so this returns in <500ms even on
+ * mainnet — the production alternative to raw getProgramAccounts.
+ *
+ * Pagination: walks pages until an empty page is returned or a safety cap
+ * is hit. Each page fetches up to 1000 items.
+ */
+export async function fetchRegionsViaDAS(
+  collectionAddress: string,
+): Promise<DasRegionRow[]> {
+  const rows: DasRegionRow[] = [];
+  const pageSize = 1000;
+  const maxPages = 20; // 20,000 assets cap matches the grid size
+
+  for (let page = 1; page <= maxPages; page++) {
+    const res = await fetch(config.rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "das-regions",
+        method: "getAssetsByGroup",
+        params: {
+          groupKey: "collection",
+          groupValue: collectionAddress,
+          page,
+          limit: pageSize,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`DAS getAssetsByGroup HTTP ${res.status}`);
+    }
+
+    const body = (await res.json()) as {
+      error?: { message?: string };
+      result?: { items?: DasAsset[] };
+    };
+
+    if (body.error) {
+      throw new Error(`DAS error: ${body.error.message ?? "unknown"}`);
+    }
+
+    const items = body.result?.items ?? [];
+    for (const item of items) {
+      const attrs = item.plugins?.attributes?.data?.attribute_list ?? [];
+      rows.push({
+        address: item.id,
+        owner: item.ownership?.owner ?? "",
+        attributes: attrs,
+      });
+    }
+
+    if (items.length < pageSize) break;
+  }
+
+  return rows;
+}
+
 // ---- IPFS helper ----
 
 export function ipfsToGateway(uri: string): string {

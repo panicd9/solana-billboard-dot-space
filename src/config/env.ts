@@ -9,6 +9,12 @@ export interface AppConfig {
   treasury: string;
   pinataJwt: string;
   pinataGateway: string;
+  /**
+   * Use Metaplex DAS API (getAssetsByGroup) instead of raw getProgramAccounts
+   * to list Core assets. Requires a DAS-compatible RPC endpoint (Helius,
+   * Triton, Shyft). Avoids the slow full-program scan that mainnet gPA hits.
+   */
+  useDAS: boolean;
 }
 
 const DEFAULT_RPC: Record<SolanaNetwork, string> = {
@@ -39,6 +45,7 @@ function getConfig(): AppConfig {
     treasury: import.meta.env.VITE_TREASURY || "",
     pinataJwt: import.meta.env.VITE_PINATA_JWT || "",
     pinataGateway: import.meta.env.VITE_PINATA_GATEWAY || "",
+    useDAS: import.meta.env.VITE_USE_DAS === "true",
   };
 }
 

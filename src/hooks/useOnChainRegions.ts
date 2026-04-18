@@ -4,9 +4,11 @@ import type { Region } from "@/types/region";
 import {
   fetchAllCoreAssets,
   fetchCoreAssetsByAddresses,
+  fetchRegionsViaDAS,
   parseRegionAttributes,
   ipfsToGateway,
   fetchAllListingsAndBoosts,
+  type RegionAttributes,
 } from "@/solana/accounts";
 import { COLLECTION_ADDRESS } from "@/solana/constants";
 import { config } from "@/config/env";
@@ -128,18 +130,58 @@ function tryParseAttributesPlugin(
   return null;
 }
 
-// On localnet, surfpool merges local state with its upstream RPC and the
-// getProgramAccounts scan against MPL Core on the upstream is painfully slow
-// (~25s against public mainnet-beta). `seed-local.ts` writes the minted asset
-// addresses to /seed-assets.json, which lets us bypass the scan entirely and
-// hit getMultipleAccounts instead. Mainnet/devnet still go through the normal
-// getProgramAccounts path.
+type ParsedRegion = {
+  address: string;
+  owner: string;
+  attrs: RegionAttributes;
+};
+
 type CoreAssetRow = {
   pubkey: string;
   account: { data: unknown };
 };
 
-async function fetchCoreAssetsForCurrentNetwork(): Promise<CoreAssetRow[]> {
+/** Parse `{pubkey, account: {data}}` rows from gPA/gMA into ParsedRegion. */
+function parseRawCoreRows(accounts: CoreAssetRow[]): ParsedRegion[] {
+  const parsed: ParsedRegion[] = [];
+  for (const account of accounts) {
+    const address = account.pubkey;
+    const rawData = account.account.data;
+
+    let data: Uint8Array;
+    if (typeof rawData === "string") {
+      data = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
+    } else if (Array.isArray(rawData)) {
+      data = Uint8Array.from(atob(rawData[0] as string), (c) => c.charCodeAt(0));
+    } else {
+      console.warn(`[useOnChainRegions] Skipping ${address}: unknown data format`);
+      continue;
+    }
+
+    const owner = decodeOwnerFromCoreAsset(data);
+    const attrList = tryParseAttributesPlugin(data);
+
+    if (!attrList) {
+      console.warn(
+        `[useOnChainRegions] Skipping ${address}: could not parse attributes (data length: ${data.length})`,
+      );
+      continue;
+    }
+
+    parsed.push({ address, owner, attrs: parseRegionAttributes(attrList) });
+  }
+  return parsed;
+}
+
+/**
+ * Resolves the list of regions in the collection via the fastest available
+ * path:
+ *   1. localnet + `public/seed-assets.json` — getMultipleAccounts on known addresses
+ *   2. DAS enabled (prod) — getAssetsByGroup via Helius/Triton/Shyft
+ *   3. fallback — raw getProgramAccounts scan (slow on mainnet public RPC)
+ */
+async function fetchRegions(): Promise<ParsedRegion[]> {
+  // 1. localnet bypass
   if (config.network === "localnet") {
     try {
       const res = await fetch("/seed-assets.json", { cache: "no-store" });
@@ -153,18 +195,39 @@ async function fetchCoreAssetsForCurrentNetwork(): Promise<CoreAssetRow[]> {
           manifest.assets?.length
         ) {
           console.log(
-            `[useOnChainRegions] localnet bypass: fetching ${manifest.assets.length} seeded assets via getMultipleAccounts`
+            `[useOnChainRegions] localnet bypass: fetching ${manifest.assets.length} seeded assets via getMultipleAccounts`,
           );
-          return (await fetchCoreAssetsByAddresses(
-            manifest.assets as Address[]
+          const rows = (await fetchCoreAssetsByAddresses(
+            manifest.assets as Address[],
           )) as unknown as CoreAssetRow[];
+          return parseRawCoreRows(rows);
         }
       }
     } catch (err) {
       console.warn("[useOnChainRegions] localnet bypass unavailable:", err);
     }
   }
-  return (await fetchAllCoreAssets(COLLECTION_ADDRESS)) as unknown as CoreAssetRow[];
+
+  // 2. DAS path (production — requires DAS-compatible RPC)
+  if (config.useDAS) {
+    try {
+      const rows = await fetchRegionsViaDAS(COLLECTION_ADDRESS);
+      console.log(`[useOnChainRegions] DAS: fetched ${rows.length} assets via getAssetsByGroup`);
+      return rows.map((r) => ({
+        address: r.address,
+        owner: r.owner,
+        attrs: parseRegionAttributes(r.attributes),
+      }));
+    } catch (err) {
+      console.warn("[useOnChainRegions] DAS fetch failed, falling back to gPA:", err);
+    }
+  }
+
+  // 3. fallback — raw getProgramAccounts
+  const accounts = (await fetchAllCoreAssets(
+    COLLECTION_ADDRESS,
+  )) as unknown as CoreAssetRow[];
+  return parseRawCoreRows(accounts);
 }
 
 export function useOnChainRegions() {
@@ -176,44 +239,8 @@ export function useOnChainRegions() {
         return [];
       }
 
-      const accounts = await fetchCoreAssetsForCurrentNetwork();
-      console.log(`[useOnChainRegions] Fetched ${accounts.length} Core assets`);
-
-      // Parse all account data synchronously first
-      const parsed: Array<{
-        address: string;
-        owner: string;
-        attrs: ReturnType<typeof parseRegionAttributes>;
-      }> = [];
-
-      for (const account of accounts) {
-        const address = account.pubkey;
-        const rawData = account.account.data;
-
-        let data: Uint8Array;
-        if (typeof rawData === "string") {
-          data = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
-        } else if (Array.isArray(rawData)) {
-          data = Uint8Array.from(atob(rawData[0] as string), (c) => c.charCodeAt(0));
-        } else {
-          console.warn(`[useOnChainRegions] Skipping ${address}: unknown data format`);
-          continue;
-        }
-
-        const owner = decodeOwnerFromCoreAsset(data);
-        const attrList = tryParseAttributesPlugin(data);
-
-        if (!attrList) {
-          console.warn(`[useOnChainRegions] Skipping ${address}: could not parse attributes (data length: ${data.length})`);
-          continue;
-        }
-
-        parsed.push({
-          address: address as string,
-          owner,
-          attrs: parseRegionAttributes(attrList),
-        });
-      }
+      const parsed = await fetchRegions();
+      console.log(`[useOnChainRegions] Resolved ${parsed.length} regions`);
 
       if (parsed.length === 0) return [];
 
