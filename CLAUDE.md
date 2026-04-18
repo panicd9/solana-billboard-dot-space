@@ -15,48 +15,78 @@ npm run test:watch   # Watch mode (vitest)
 
 ## Architecture
 
-**Pixel Canvas Studio** is a Solana-integrated pixel marketplace SPA where users purchase rectangular grid regions, upload images to them, and trade them. Built with Vite + React 18 + TypeScript + Tailwind CSS + shadcn/ui.
+**Solana Billboard** (solanabillboard.space) is a Solana-integrated pixel marketplace where users mint rectangular grid regions as NFTs, attach images/links, boost them, and resell via Dutch-auction listings. Built with Vite + React 18 + TypeScript + Tailwind CSS + shadcn/ui.
 
-### Provider Stack (App.tsx)
+### Provider Stack ([src/App.tsx](src/App.tsx))
 
-`QueryClientProvider` → `SolanaProvider` → `TooltipProvider` → `BrowserRouter`
+`QueryClientProvider` → `SolanaProvider` → `TooltipProvider` → `BrowserRouter` → `RegionProvider` → `Routes`
 
-- **SolanaProvider** wraps `@solana/wallet-adapter-react` configured for devnet with Phantom wallet
-- **RegionProvider** (mounted in `pages/Index.tsx`, not App) holds all pixel region state
+- **SolanaProvider** ([src/components/SolanaProvider.tsx](src/components/SolanaProvider.tsx)) uses the new `@solana/kit` stack — `createClient` from `@solana/client` + `SolanaProvider` from `@solana/react-hooks` with `autoDiscover()` wallet connectors and `autoConnect: true` persistence. No `wallet-adapter-react`.
+- **RegionProvider** ([src/context/RegionContext.tsx](src/context/RegionContext.tsx)) is mounted inside `BrowserRouter` in App.tsx so all routes share region state.
+
+### On-chain Integration
+
+This app talks to a deployed Anchor/Solana program (program ID in [src/config/env.ts](src/config/env.ts), default `DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2`). Network, RPC/WS URLs, USDC mint, collection address, treasury ATA, and Pinata credentials are all `VITE_*` env vars with devnet defaults.
+
+- [src/solana/constants.ts](src/solana/constants.ts) — program addresses, grid dims, pricing constants, boost flags (must match Rust `constants.rs`).
+- [src/solana/pricing.ts](src/solana/pricing.ts) — `calculateRegionPrice` mirrors the on-chain pricing function; `calculateListingCurrentPrice` computes the current Dutch-auction price.
+- [src/solana/accounts.ts](src/solana/accounts.ts) — account fetching + `ipfsToGateway` URL helper.
+- [src/solana/transactions.ts](src/solana/transactions.ts) — instruction builders.
+- [src/solana/activityEvents.ts](src/solana/activityEvents.ts) — parses program logs into activity feed events.
+- [src/solana/ipfs.ts](src/solana/ipfs.ts) — Pinata upload.
 
 ### Core Data Flow
 
-All region state lives in `RegionContext` (`src/context/RegionContext.tsx`):
-- `regions: Region[]` — purchased pixel regions
-- `occupancy: Map<string, string>` — `"col:row"` → `regionId` for fast collision detection
-- `loadedImages: Map<string, HTMLImageElement>` — preloaded images for canvas rendering
-- Operations: `purchaseRegion`, `setRegionImage`, `listRegion`, `unlistRegion`, `buyListedRegion`
+All region state is read from on-chain accounts via TanStack Query and exposed through `RegionContext`:
 
-**Currently all state is client-side with mock addresses. No on-chain program calls yet.**
+- **Queries**: `useCanvasState` (global canvas account — occupancy bitmap, curve blocks sold), `useOnChainRegions` (all region accounts), `useActivityEvents` (program activity feed), `useProgramTransactions` (recent signatures).
+- **Mutations** (in [src/hooks/useProgramTransactions.ts](src/hooks/useProgramTransactions.ts)): `useMintRegion`, `useUpdateRegionImage`, `useUpdateRegionLink`, `useCreateListing`, `useCancelListing`, `useExecutePurchase`, `useBuyBoost`. Each applies optimistic cache updates.
+- **Image preload**: Context preloads static images into `loadedImages: Map<id, HTMLImageElement>`. Animated GIFs are decoded via `gifuct-js` in [src/hooks/useAnimatedImages.ts](src/hooks/useAnimatedImages.ts) and exposed as `animatedImages`.
+- `occupancy` is a `Set<string>` of `"x:y"` keys derived from the canvas bitmap; `getRegionAt` falls back to scanning connected occupied blocks when a click hits a bitmap cell whose full `Region` object isn't loaded yet.
 
-### Grid System (src/types/region.ts)
+### Grid & Pricing ([src/solana/constants.ts](src/solana/constants.ts), [src/types/region.ts](src/types/region.ts))
 
-192×108 grid of 10px blocks = 1920×1080 canvas. Regions are rectangles defined by `(startX, startY, width, height)` in grid coordinates. Price: 0.01 SOL per block.
+- 192×108 grid of 10px blocks = 1920×1080 canvas (20,736 blocks total).
+- **Center zone**: 60×34 block region centered at (66, 37). Flat price **0.12 USDC/block**.
+- **Curve zone**: remaining 18,696 blocks follow a linear bonding curve from **0.01 → 0.10 USDC/block** as `curveBlocksSold` increases.
+- Prices are in USDC lamports (6 decimals). Use `formatUsdc()` for display. **Never assume SOL or flat pricing.**
+- **Boosts**: HIGHLIGHTED (1 USDC), GLOWING (2 USDC), TRENDING (5 USDC) — bitflags on the region account.
+- **Marketplace fee**: 4% (400 bps).
 
-### Key Components
+### Routes ([src/App.tsx](src/App.tsx))
+
+| Path | Page |
+|------|------|
+| `/` | [Index](src/pages/Index.tsx) — canvas + marketplace toggle |
+| `/u/:wallet` | [Profile](src/pages/Profile.tsx) — public owner profile |
+| `/embed/r/:assetId` | [Embed](src/pages/Embed.tsx) — iframe widget for a single region |
+| `/activity` | [Activity](src/pages/Activity.tsx) — program activity feed |
+| `*` | [NotFound](src/pages/NotFound.tsx) |
+
+Deep link: `/?region=<assetId>` on `/` auto-selects and opens a region once data loads.
+
+### Key Components ([src/components/](src/components/))
 
 | Component | Role |
 |-----------|------|
-| `PixelCanvas` | Canvas2D renderer — drag-to-select regions, renders region images, hover tooltips |
-| `PurchasePanel` | Floating panel for buying selected region + image upload |
-| `RegionSidebar` | Details panel for a selected region (edit image/URL, list/unlist, buy) |
-| `MarketplaceView` | Grid listing of all regions with sort options |
-| `CanvasToolbar` | Header with canvas/marketplace toggle + wallet connect |
+| `PixelCanvas` | Canvas2D renderer — drag-to-select, renders images + animated GIFs, hover tooltips, pricing overlay |
+| `CanvasToolbar` | Header with canvas/marketplace toggle + `WalletButton` + `WalletBalances` |
+| `PurchasePanel` | Floating panel for minting selected region (image upload → Pinata, link, price preview) |
+| `RegionSidebar` | Details for a selected region — edit image/URL, list/unlist, buy, buy boosts, copy-embed |
+| `MarketplaceView` | Sortable grid listing |
+| `TrendingSidebar` | Collapsible list of trending-boosted regions |
+| `RegionMiniMap` | Overview map used in sidebars |
+| `ActivityRow` | Single event row used in `/activity` |
+| `NavLink` | Router link with active state |
 
-### Routing
-
-Single page app: `/` renders `Index`, `*` renders `NotFound`. Views toggle between canvas and marketplace via local state, not routes.
+UI primitives in [src/components/ui/](src/components/ui/) are shadcn/ui — do not hand-edit.
 
 ## Conventions
 
-- Import paths use `@/` alias mapping to `./src`
-- UI primitives are in `src/components/ui/` (shadcn/ui — do not manually edit these)
-- Custom components go directly in `src/components/`
-- Dark theme only — CSS variables defined in `src/index.css` with teal primary (#00D2BE) and gold accent (#FFC837)
-- Fonts: Space Grotesk (headings), JetBrains Mono (code)
-- `global: "globalThis"` is defined in vite.config.ts for Buffer polyfill compatibility
+- Import paths use `@/` alias mapping to `./src`.
+- Custom components go directly in [src/components/](src/components/); shadcn primitives stay under `ui/`.
+- Dark theme only — CSS variables in [src/index.css](src/index.css), teal primary (#00D2BE) and gold accent (#FFC837).
+- Fonts: Space Grotesk (headings), JetBrains Mono (code).
+- `global: "globalThis"` is defined in [vite.config.ts](vite.config.ts) for Buffer polyfill compatibility.
+- Grid dimensions and pricing constants must stay in sync with the Rust program's `constants.rs`.
+- Treat lamport amounts as `bigint` end-to-end; only convert to `number` at the display boundary via `formatUsdc`.
