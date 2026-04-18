@@ -33,7 +33,7 @@ const Embed = () => {
         )
       : null;
 
-  const siteUrl = "https://billboard.space";
+  const siteUrl = "https://solanabillboard.space";
   const regionUrl = assetId ? `${siteUrl}/?region=${assetId}` : siteUrl;
 
   return (
@@ -51,7 +51,7 @@ const Embed = () => {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
           >
-            <ExternalLink className="w-3 h-3" /> billboard.space
+            <ExternalLink className="w-3 h-3" /> solanabillboard.space
           </a>
         </div>
       ) : (
@@ -112,7 +112,7 @@ const Embed = () => {
             <div className="shrink-0 flex items-center gap-1.5">
               <img src={logo} alt="" className="w-4 h-4 rounded-sm" />
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider group-hover:text-primary transition-colors">
-                billboard.space
+                solanabillboard.space
               </span>
             </div>
           </div>
