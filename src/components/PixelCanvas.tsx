@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react";
-import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, type Selection, type Region } from "@/types/region";
+import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, isBoostActive, type Selection, type Region } from "@/types/region";
 import { CENTER_ZONE_X, CENTER_ZONE_Y, CENTER_ZONE_WIDTH, CENTER_ZONE_HEIGHT } from "@/solana/constants";
 import { useRegions } from "@/context/RegionContext";
 import { ZoomIn, ZoomOut, Maximize, MousePointer2, Coins, X, Loader2 } from "lucide-react";
@@ -257,9 +257,35 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
   );
 
   // Detect whether any animated boost is visible
-  const hasAnimatedBoost = !reducedMotion && regions.some((r) => r.isHighlighted || r.hasGlowBorder);
+  const nowSecForBoosts = Math.floor(Date.now() / 1000);
+  const hasAnimatedBoost =
+    !reducedMotion &&
+    regions.some(
+      (r) =>
+        isBoostActive(r.highlightedAt, nowSecForBoosts) ||
+        isBoostActive(r.glowingAt, nowSecForBoosts)
+    );
   // Detect whether any animated GIF region is present
   const hasAnimatedGif = !reducedMotion && animatedImages.size > 0;
+
+  // Accessible summary: active boost counts for screen readers (canvas itself is inert SR-wise).
+  const boostCounts = regions.reduce(
+    (acc, r) => {
+      if (isBoostActive(r.highlightedAt, nowSecForBoosts)) acc.highlight++;
+      if (isBoostActive(r.glowingAt, nowSecForBoosts)) acc.glow++;
+      if (isBoostActive(r.trendingAt, nowSecForBoosts)) acc.trending++;
+      return acc;
+    },
+    { highlight: 0, glow: 0, trending: 0 }
+  );
+  const boostSummary = [
+    boostCounts.highlight && `${boostCounts.highlight} highlighted`,
+    boostCounts.glow && `${boostCounts.glow} glowing`,
+    boostCounts.trending && `${boostCounts.trending} trending`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const canvasSummary = `Pixel billboard: ${regions.length} region${regions.length === 1 ? "" : "s"} placed${boostSummary ? `; ${boostSummary}` : ""}.`;
 
   // Draw loop
   useEffect(() => {
@@ -350,7 +376,11 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
       // Render regions
       const now = Date.now();
+      const nowSec = Math.floor(now / 1000);
       for (const region of regions) {
+        const hl = isBoostActive(region.highlightedAt, nowSec);
+        const gl = isBoostActive(region.glowingAt, nowSec);
+        const tr = isBoostActive(region.trendingAt, nowSec);
         const rx = region.startX * BLOCK_SIZE;
         const ry = region.startY * BLOCK_SIZE;
         const rw = region.width * BLOCK_SIZE;
@@ -405,15 +435,16 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           }
         }
 
-        // Highlight boost — pulsing inner glow
-        if (region.isHighlighted) {
+        // Highlight boost — pulsing cyan inner glow (matches cyan-500 badge)
+        if (hl) {
           const hPulse = reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 400);
           const inset = Math.max(rw, rh) * (0.15 + hPulse * 0.20);
           const glowAlpha = 0.2 + hPulse * 0.2;
 
-          const r = Math.round(66 + (41 - 66) * hPulse);
-          const g = Math.round(132 + (234 - 132) * hPulse);
-          const b = Math.round(219 + (196 - 219) * hPulse);
+          // Ramp from cyan-400 (34,211,238) to cyan-300 (103,232,249) — matches BOOST_META.highlight.
+          const r = Math.round(34 + (103 - 34) * hPulse);
+          const g = Math.round(211 + (232 - 211) * hPulse);
+          const b = Math.round(238 + (249 - 238) * hPulse);
 
           ctx.save();
           ctx.beginPath();
@@ -456,7 +487,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         }
 
         // Glow boost — rotating snake border (static when reduced motion)
-        if (region.hasGlowBorder) {
+        if (gl) {
           const perimeter = 2 * (rw + rh);
           const snakeLen = perimeter * 0.3;
           const gapLen = perimeter - snakeLen;
@@ -497,9 +528,49 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           ctx.strokeRect(rx, ry, rw, rh);
         }
 
-        if (region.isTrending) {
-          ctx.fillStyle = "rgba(255, 140, 0, 0.9)";
-          ctx.fillRect(rx, ry, 6, 6);
+        if (tr) {
+          // Trending badge — rounded orange disc with a TrendingUp-style arrow,
+          // top-right corner. Matches the BoostDot used in the marketplace.
+          const badge = Math.max(10, Math.min(16, Math.min(rw, rh) * 0.28));
+          const inset = Math.max(2, badge * 0.18);
+          const bx = rx + rw - badge - inset;
+          const by = ry + inset;
+          const cx = bx + badge / 2;
+          const cy = by + badge / 2;
+          const br = badge / 2;
+
+          ctx.save();
+          ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+          ctx.shadowBlur = 3 / zoom;
+          ctx.shadowOffsetY = 1 / zoom;
+          ctx.fillStyle = "rgba(255, 140, 0, 0.95)";
+          ctx.beginPath();
+          ctx.arc(cx, cy, br, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // Arrow: diagonal stroke pointing up-right + arrowhead at top-right.
+          ctx.save();
+          ctx.strokeStyle = "rgba(28, 14, 0, 0.92)";
+          ctx.lineWidth = Math.max(1.2 / zoom, badge * 0.12);
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          const pad = badge * 0.28;
+          const x0 = bx + pad;
+          const y0 = by + badge - pad;
+          const x1 = bx + badge - pad;
+          const y1 = by + pad;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+          const head = badge * 0.28;
+          ctx.beginPath();
+          ctx.moveTo(x1 - head, y1);
+          ctx.lineTo(x1, y1);
+          ctx.lineTo(x1, y1 + head);
+          ctx.stroke();
+          ctx.restore();
         }
       }
 
@@ -617,6 +688,9 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
       {/* Live region for screen reader keyboard feedback */}
       <div className="sr-only" aria-live="polite">{cursorLabel}</div>
+
+      {/* Accessible summary of canvas state (region count + active boosts) for SR users. */}
+      <div className="sr-only" aria-live="polite">{canvasSummary}</div>
 
       {/* Loading state — initial chain fetch */}
       {showLoading && (

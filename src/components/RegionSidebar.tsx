@@ -8,9 +8,6 @@ import {
   ShoppingCart,
   Image,
   Link,
-  Sparkles,
-  Zap,
-  TrendingUp,
   Loader2,
   Info,
   User,
@@ -31,13 +28,16 @@ import {
 } from "@/components/ui/select";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
-import { BOOST_COST_SOL } from "@/types/region";
 import {
-  BOOST_HIGHLIGHTED,
-  BOOST_GLOWING,
-  BOOST_TRENDING,
-  SOL_DECIMALS,
-} from "@/solana/constants";
+  BOOST_COST_SOL,
+  isBoostActive,
+  boostSecondsRemaining,
+  formatBoostCountdown,
+} from "@/types/region";
+import { SOL_DECIMALS } from "@/solana/constants";
+import { BOOST_META_LIST, getBoostDescription } from "@/lib/boosts";
+import { useNowSeconds } from "@/hooks/useNow";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import { useWalletConnection } from "@solana/react-hooks";
 
@@ -53,6 +53,8 @@ const RegionSidebar = () => {
     buyBoost,
   } = useRegions();
   const { wallet } = useWalletConnection();
+  const nowSec = useNowSeconds(1000);
+  const reducedMotion = useReducedMotion();
   const [startPrice, setStartPrice] = useState("");
   const [endPrice, setEndPrice] = useState("");
   const [duration, setDuration] = useState("86400"); // 24h default
@@ -152,7 +154,7 @@ const RegionSidebar = () => {
     setEditingLink(true);
   };
 
-  const handleBoost = (flags: number, name: string) => {
+  const handleBoost = (flags: number) => {
     withBusy(`boost-${flags}`, () => buyBoost(r.id, flags));
   };
 
@@ -183,23 +185,38 @@ const RegionSidebar = () => {
         </div>
       )}
 
-      {(r.isHighlighted || r.hasGlowBorder || r.isTrending) && (
-        <div className="px-4 pt-3 pb-1 flex flex-wrap gap-1.5">
-          {r.isHighlighted && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 shadow-[0_0_8px_rgba(41,234,196,0.25)]">
-              <Sparkles className="w-2.5 h-2.5" aria-hidden="true" /> Highlighted
-            </span>
-          )}
-          {r.hasGlowBorder && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-400/30 shadow-[0_0_8px_rgba(153,69,255,0.3)]">
-              <Zap className="w-2.5 h-2.5" aria-hidden="true" /> Glowing
-            </span>
-          )}
-          {r.isTrending && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30 shadow-[0_0_8px_rgba(255,140,0,0.25)]">
-              <TrendingUp className="w-2.5 h-2.5" aria-hidden="true" /> Trending
-            </span>
-          )}
+      {BOOST_META_LIST.some((m) => isBoostActive(m.getAt(r), nowSec)) && (
+        <div className="px-4 pt-3 pb-1 flex flex-wrap items-center gap-1.5">
+          {BOOST_META_LIST.filter((m) => isBoostActive(m.getAt(r), nowSec)).map((m) => {
+            const Icon = m.icon;
+            const remaining = formatBoostCountdown(boostSecondsRemaining(m.getAt(r), nowSec));
+            return (
+              <span
+                key={m.kind}
+                className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${m.badgeClass}`}
+                title={`${m.label} · ${remaining} · ${getBoostDescription(m, reducedMotion)}`}
+              >
+                <Icon className="w-2.5 h-2.5" aria-hidden="true" /> {m.label} · {remaining}
+              </span>
+            );
+          })}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="cursor-help inline-flex items-center justify-center w-4 h-4 rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="What are boosts?"
+              >
+                <Info className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px]">
+              <p className="text-xs">
+                Boosts are paid visibility upgrades the owner can buy for {BOOST_COST_SOL} SOL each.
+                Each lasts 24h; active boosts show here with a countdown.
+              </p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
 
@@ -371,59 +388,55 @@ const RegionSidebar = () => {
               <TooltipTrigger asChild>
                 <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="text-xs">Boosts last 24 hours</p>
+              <TooltipContent side="top" className="max-w-[220px]">
+                <p className="text-xs">
+                  Each boost costs {BOOST_COST_SOL} SOL and lasts 24h. Re-buying while active
+                  extends by another 24h. Paid to the treasury.
+                </p>
               </TooltipContent>
             </Tooltip>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2"
-            disabled={r.isHighlighted || busyAction === `boost-${BOOST_HIGHLIGHTED}`}
-            onClick={() => handleBoost(BOOST_HIGHLIGHTED, "Highlight")}
-          >
-            {busyAction === `boost-${BOOST_HIGHLIGHTED}` ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4 text-yellow-400" />
-            )}
-            {r.isHighlighted
-              ? "Highlighted"
-              : `Highlight (${BOOST_COST_SOL} SOL)`}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2"
-            disabled={r.hasGlowBorder || busyAction === `boost-${BOOST_GLOWING}`}
-            onClick={() => handleBoost(BOOST_GLOWING, "Glow")}
-          >
-            {busyAction === `boost-${BOOST_GLOWING}` ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Zap className="w-4 h-4 text-cyan-400" />
-            )}
-            {r.hasGlowBorder
-              ? "Glowing"
-              : `Border Glow (${BOOST_COST_SOL} SOL)`}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2"
-            disabled={r.isTrending || busyAction === `boost-${BOOST_TRENDING}`}
-            onClick={() => handleBoost(BOOST_TRENDING, "Trending")}
-          >
-            {busyAction === `boost-${BOOST_TRENDING}` ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <TrendingUp className="w-4 h-4 text-orange-400" />
-            )}
-            {r.isTrending
-              ? "Trending"
-              : `Pin Trending (${BOOST_COST_SOL} SOL)`}
-          </Button>
+          {BOOST_META_LIST.map((m) => {
+            const Icon = m.icon;
+            const at = m.getAt(r);
+            const active = isBoostActive(at, nowSec);
+            const remaining = active
+              ? formatBoostCountdown(boostSecondsRemaining(at, nowSec))
+              : null;
+            const busy = busyAction === `boost-${m.flag}`;
+            const anyBoostBusy = busyAction?.startsWith("boost-") ?? false;
+            return (
+              <div key={m.kind} className="space-y-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 justify-start"
+                  disabled={anyBoostBusy}
+                  onClick={() => handleBoost(m.flag)}
+                >
+                  {busy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Icon className={`w-4 h-4 ${m.iconClass}`} />
+                  )}
+                  <span className="flex-1 text-left">
+                    {active
+                      ? `Extend ${m.label} 24h`
+                      : `${m.label} 24h`}
+                  </span>
+                  <span className="text-muted-foreground">{BOOST_COST_SOL} SOL</span>
+                </Button>
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground pl-1">
+                  <span className="truncate pr-2">
+                    {getBoostDescription(m, reducedMotion)}
+                  </span>
+                  {active && (
+                    <span className={`${m.iconClass} font-mono shrink-0`}>{remaining}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

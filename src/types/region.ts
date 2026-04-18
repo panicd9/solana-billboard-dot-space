@@ -20,10 +20,11 @@ export interface Region {
   isListed: boolean;
   listing: ListingInfo | null;
   createdAt: number;
-  boostFlags: number;
-  isHighlighted: boolean;
-  hasGlowBorder: boolean;
-  isTrending: boolean;
+  // Unix seconds at which each boost window was last started (or shifted forward on extend).
+  // 0 = never purchased. Active iff `nowSec - at < BOOST_DURATION_SECONDS`.
+  highlightedAt: bigint;
+  glowingAt: bigint;
+  trendingAt: bigint;
 }
 
 export interface Selection {
@@ -39,4 +40,25 @@ export const BLOCK_SIZE = 10;
 export const CANVAS_W = GRID_COLS * BLOCK_SIZE;
 export const CANVAS_H = GRID_ROWS * BLOCK_SIZE;
 
+// Boost economics — must match Rust constants.rs.
 export const BOOST_COST_SOL = 0.015;
+export const BOOST_DURATION_SECONDS = 86_400;
+
+export function isBoostActive(at: bigint, nowSec: number): boolean {
+  if (at === 0n) return false;
+  return nowSec - Number(at) < BOOST_DURATION_SECONDS;
+}
+
+export function boostSecondsRemaining(at: bigint, nowSec: number): number {
+  if (at === 0n) return 0;
+  return Math.max(0, Number(at) + BOOST_DURATION_SECONDS - nowSec);
+}
+
+export function formatBoostCountdown(remainingSec: number): string {
+  if (remainingSec <= 0) return "expired";
+  const h = Math.floor(remainingSec / 3600);
+  const m = Math.floor((remainingSec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m left`;
+  if (m > 0) return `${m}m left`;
+  return `${remainingSec}s left`;
+}

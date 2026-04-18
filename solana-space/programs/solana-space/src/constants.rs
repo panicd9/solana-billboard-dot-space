@@ -45,6 +45,8 @@ pub const BOOST_TRENDING: u8 = 1 << 2; // bit 2 = 4
 
 pub const BOOST_PRICE: u64 = 15_000_000;
 
+pub const BOOST_DURATION_SECONDS: i64 = 86_400; // 24h
+
 // === Marketplace constants ===
 #[constant]
 pub const LISTING_SEED: &[u8] = b"listing";

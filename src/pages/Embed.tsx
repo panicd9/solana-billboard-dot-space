@@ -1,14 +1,19 @@
 import { useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { ExternalLink, Tag, Sparkles, Zap, TrendingUp } from "lucide-react";
+import { ExternalLink, Tag } from "lucide-react";
 import RegionMiniMap from "@/components/RegionMiniMap";
+import { BoostDot } from "@/components/BoostDot";
 import { useRegions } from "@/context/RegionContext";
+import { useNowSeconds } from "@/hooks/useNow";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
+import { BOOST_META_LIST } from "@/lib/boosts";
+import { isBoostActive, boostSecondsRemaining, formatBoostCountdown } from "@/types/region";
 import logo from "@/assets/logo.png";
 
 const Embed = () => {
   const { assetId } = useParams<{ assetId: string }>();
   const { regions, isLoading } = useRegions();
+  const nowSec = useNowSeconds(30_000);
 
   const region = useMemo(
     () => regions.find((r) => r.id === assetId),
@@ -32,6 +37,10 @@ const Embed = () => {
           )
         )
       : null;
+
+  const activeBoosts = region
+    ? BOOST_META_LIST.filter((m) => isBoostActive(m.getAt(region), nowSec))
+    : [];
 
   const siteUrl = "https://solanabillboard.space";
   const regionUrl = assetId ? `${siteUrl}/?region=${assetId}` : siteUrl;
@@ -72,17 +81,15 @@ const Embed = () => {
             ) : (
               <div className="text-muted-foreground text-xs font-mono">No image</div>
             )}
-            {(region.isHighlighted || region.hasGlowBorder || region.isTrending) && (
+            {activeBoosts.length > 0 && (
               <div className="absolute top-1.5 right-1.5 flex gap-1">
-                {region.isHighlighted && (
-                  <BoostDot color="cyan" icon={<Sparkles className="w-2.5 h-2.5" />} />
-                )}
-                {region.hasGlowBorder && (
-                  <BoostDot color="purple" icon={<Zap className="w-2.5 h-2.5" />} />
-                )}
-                {region.isTrending && (
-                  <BoostDot color="orange" icon={<TrendingUp className="w-2.5 h-2.5" />} />
-                )}
+                {activeBoosts.map((m) => (
+                  <BoostDot
+                    key={m.kind}
+                    meta={m}
+                    title={`${m.label} · ${formatBoostCountdown(boostSecondsRemaining(m.getAt(region), nowSec))}`}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -119,28 +126,6 @@ const Embed = () => {
         </a>
       )}
     </div>
-  );
-};
-
-const BoostDot = ({
-  color,
-  icon,
-}: {
-  color: "cyan" | "purple" | "orange";
-  icon: React.ReactNode;
-}) => {
-  const cls = {
-    cyan: "bg-cyan-500/90 text-cyan-50 shadow-[0_0_8px_rgba(41,234,196,0.6)]",
-    purple: "bg-purple-500/90 text-purple-50 shadow-[0_0_8px_rgba(153,69,255,0.6)]",
-    orange: "bg-orange-500/90 text-orange-50 shadow-[0_0_8px_rgba(255,140,0,0.6)]",
-  }[color];
-  return (
-    <span
-      className={`w-5 h-5 rounded-full inline-flex items-center justify-center ${cls}`}
-      aria-hidden="true"
-    >
-      {icon}
-    </span>
   );
 };
 

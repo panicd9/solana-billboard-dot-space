@@ -78,6 +78,12 @@ export async function bootstrap(): Promise<TestContext> {
   const treasury = Keypair.generate();
   const collection = Keypair.generate();
 
+  // Pre-fund treasury above rent-exempt minimum so the first (cheap curve-zone)
+  // mint doesn't fail system_program::transfer with "insufficient funds for rent".
+  // CURVE_START_PRICE (40k lamports) alone is below the ~890k rent-exempt floor,
+  // so a fresh System-owned treasury would otherwise be rejected on creation.
+  await airdrop(provider.connection, treasury.publicKey, LAMPORTS_PER_SOL);
+
   const canvas = canvasPda(program.programId);
 
   await program.methods

@@ -5,41 +5,64 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRegions } from "@/context/RegionContext";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import RegionMiniMap from "@/components/RegionMiniMap";
+import { BoostDot } from "@/components/BoostDot";
+import { BOOST_META_LIST } from "@/lib/boosts";
+import { useNowSeconds } from "@/hooks/useNow";
+import {
+  isBoostActive,
+  boostSecondsRemaining,
+  formatBoostCountdown,
+} from "@/types/region";
 
 interface Props {
   onHighlightRegion: (regionId: string) => void;
 }
 
 type SortKey = "price" | "size" | "recent";
-type FilterKey = "all" | "listed" | "unlisted";
+type FilterKey = "all" | "listed" | "unlisted" | "boosted";
 
 const MarketplaceView = ({ onHighlightRegion }: Props) => {
   const { regions, setSelectedRegion, isLoading } = useRegions();
+  const nowSec = useNowSeconds(30_000);
   const [sortBy, setSortBy] = useState<SortKey>("recent");
   const [filterBy, setFilterBy] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
 
   const sorted = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const boostCount = (r: typeof regions[number]) =>
+      BOOST_META_LIST.reduce(
+        (n, m) => n + (isBoostActive(m.getAt(r), nowSec) ? 1 : 0),
+        0
+      );
     let filtered = regions;
     if (filterBy === "listed") filtered = filtered.filter((r) => r.isListed);
     else if (filterBy === "unlisted") filtered = filtered.filter((r) => !r.isListed);
+    else if (filterBy === "boosted") filtered = filtered.filter((r) => boostCount(r) > 0);
     if (q) {
       filtered = filtered.filter((r) =>
         r.owner.toLowerCase().includes(q) || r.linkUrl?.toLowerCase().includes(q)
       );
     }
     const copy = [...filtered];
+    // Always float actively-boosted regions to the top so paid visibility pays off.
+    const boostAwareSort = (
+      primary: (a: typeof copy[number], b: typeof copy[number]) => number
+    ) =>
+      copy.sort((a, b) => {
+        const diff = boostCount(b) - boostCount(a);
+        return diff !== 0 ? diff : primary(a, b);
+      });
     switch (sortBy) {
       case "price":
-        return copy.sort((a, b) => a.purchasePrice - b.purchasePrice);
+        return boostAwareSort((a, b) => a.purchasePrice - b.purchasePrice);
       case "size":
-        return copy.sort((a, b) => b.width * b.height - a.width * a.height);
+        return boostAwareSort((a, b) => b.width * b.height - a.width * a.height);
       case "recent":
       default:
-        return copy.sort((a, b) => b.createdAt - a.createdAt);
+        return boostAwareSort((a, b) => b.createdAt - a.createdAt);
     }
-  }, [regions, sortBy, filterBy, search]);
+  }, [regions, sortBy, filterBy, search, nowSec]);
 
   return (
     <div className="flex-1 overflow-auto bg-background p-4 sm:p-6">
@@ -83,7 +106,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
               />
             </div>
             <div role="group" aria-label="Filter listings" className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
-              {(["all", "listed", "unlisted"] as FilterKey[]).map((key) => (
+              {(["all", "listed", "unlisted", "boosted"] as FilterKey[]).map((key) => (
                 <Button
                   key={key}
                   size="sm"
@@ -133,6 +156,10 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                     )
                   : null;
 
+              const activeBoosts = BOOST_META_LIST.filter((m) =>
+                isBoostActive(m.getAt(r), nowSec)
+              );
+
               return (
                 <button
                   key={r.id}
@@ -144,11 +171,22 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                   }}
                   aria-label={`Region at ${r.startX},${r.startY}, ${r.width} by ${r.height}, ${currentPrice ? `listed at ${currentPrice} SOL` : "not listed"}`}
                 >
-                  <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden">
+                  <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden relative">
                     {r.imageUrl ? (
                       <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-muted-foreground text-xs font-mono">No image</div>
+                    )}
+                    {activeBoosts.length > 0 && (
+                      <div className="absolute top-1.5 right-1.5 flex gap-1">
+                        {activeBoosts.map((m) => (
+                          <BoostDot
+                            key={m.kind}
+                            meta={m}
+                            title={`${m.label} · ${formatBoostCountdown(boostSecondsRemaining(m.getAt(r), nowSec))}`}
+                          />
+                        ))}
+                      </div>
                     )}
                   </div>
                   <div className="p-3 space-y-2 text-xs font-mono">

@@ -10,6 +10,7 @@ import {
   PencilLine,
 } from "lucide-react";
 import RegionMiniMap from "@/components/RegionMiniMap";
+import { BOOST_META_LIST } from "@/lib/boosts";
 import type { ActivityEvent, ActivityType } from "@/solana/activityEvents";
 import type { Region } from "@/types/region";
 
@@ -75,6 +76,26 @@ const ActivityRow = ({ event, region }: Props) => {
               {shortAddr(event.actor)}
             </Link>{" "}
             <span className="text-muted-foreground">{v.verb}</span>
+            {event.type === "boost" && event.boostFlags != null && event.boostFlags > 0 && (
+              <>
+                {" "}
+                <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+                  {BOOST_META_LIST.filter((m) => (event.boostFlags! & m.flag) !== 0).map((m) => {
+                    const BoostIcon = m.icon;
+                    return (
+                      <span
+                        key={m.kind}
+                        className={`inline-flex items-center gap-0.5 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${m.badgeClass}`}
+                        title={`${m.label} boost`}
+                      >
+                        <BoostIcon className="w-2.5 h-2.5" aria-hidden="true" />
+                        {m.label}
+                      </span>
+                    );
+                  })}
+                </span>
+              </>
+            )}
             {event.type === "buy" && event.seller && (
               <>
                 {" "}

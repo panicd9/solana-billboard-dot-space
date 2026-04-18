@@ -7,12 +7,7 @@ import {
   ipfsToGateway,
   fetchAllListingsAndBoosts,
 } from "@/solana/accounts";
-import {
-  BOOST_HIGHLIGHTED,
-  BOOST_GLOWING,
-  BOOST_TRENDING,
-  COLLECTION_ADDRESS,
-} from "@/solana/constants";
+import { COLLECTION_ADDRESS } from "@/solana/constants";
 
 /**
  * Decode a Metaplex Core V1 asset's raw data to extract owner and name.
@@ -200,8 +195,15 @@ export function useOnChainRegions() {
               }
             : null;
 
-        const boostFlags =
-          boostsAccount?.exists ? (boostsAccount.data.flags as number) : 0;
+        const highlightedAt = boostsAccount?.exists
+          ? (boostsAccount.data.highlightedAt as bigint)
+          : 0n;
+        const glowingAt = boostsAccount?.exists
+          ? (boostsAccount.data.glowingAt as bigint)
+          : 0n;
+        const trendingAt = boostsAccount?.exists
+          ? (boostsAccount.data.trendingAt as bigint)
+          : 0n;
 
         return {
           id: p.address,
@@ -217,10 +219,9 @@ export function useOnChainRegions() {
           isListed: listing !== null,
           listing,
           createdAt: Date.now(),
-          boostFlags,
-          isHighlighted: (boostFlags & BOOST_HIGHLIGHTED) !== 0,
-          hasGlowBorder: (boostFlags & BOOST_GLOWING) !== 0,
-          isTrending: (boostFlags & BOOST_TRENDING) !== 0,
+          highlightedAt,
+          glowingAt,
+          trendingAt,
         };
       });
     },

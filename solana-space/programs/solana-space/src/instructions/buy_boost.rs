@@ -91,18 +91,7 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
         );
     }
 
-    // 4. Check none of the requested boosts are already active
-    let boosts = &mut ctx.accounts.boosts;
-    require!(boosts.flags & flags == 0, ErrorCode::BoostAlreadyActive);
-
-    // 5. Initialize fields if this is a fresh account (init_if_needed)
-    if boosts.asset == Pubkey::default() {
-        boosts.asset = ctx.accounts.asset.key();
-        boosts.bump = ctx.bumps.boosts;
-        boosts.flags = 0;
-    }
-
-    // 6. Calculate total price and transfer SOL from payer to treasury
+    // 4. Calculate total price and transfer SOL from payer to treasury
     let price = total_boost_price(flags);
     let cpi_ctx = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),
@@ -113,8 +102,24 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
     );
     system_program::transfer(cpi_ctx, price)?;
 
-    // 7. Set all requested boost flags at once
-    boosts.flags |= flags;
+    // 5. Initialize fields if this is a fresh account (init_if_needed)
+    let boosts = &mut ctx.accounts.boosts;
+    if boosts.asset == Pubkey::default() {
+        boosts.asset = ctx.accounts.asset.key();
+        boosts.bump = ctx.bumps.boosts;
+    }
+
+    // 6. Advance each requested boost's window (extend if active, fresh 24h if expired)
+    let now = Clock::get()?.unix_timestamp;
+    if flags & BOOST_HIGHLIGHTED != 0 {
+        boosts.highlighted_at = Boosts::extend(boosts.highlighted_at, now);
+    }
+    if flags & BOOST_GLOWING != 0 {
+        boosts.glowing_at = Boosts::extend(boosts.glowing_at, now);
+    }
+    if flags & BOOST_TRENDING != 0 {
+        boosts.trending_at = Boosts::extend(boosts.trending_at, now);
+    }
 
     Ok(())
 }

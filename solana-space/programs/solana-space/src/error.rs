@@ -45,9 +45,6 @@ pub enum ErrorCode {
     #[msg("Invalid boost type")]
     InvalidBoostType,
 
-    #[msg("Boost already active")]
-    BoostAlreadyActive,
-
     // --- Marketplace errors ---
     #[msg("Only the NFT owner can create a listing")]
     NotAssetOwner,

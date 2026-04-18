@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Copy, ExternalLink, Sparkles, Zap, TrendingUp, Tag } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { useWalletConnection } from "@solana/react-hooks";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
 import RegionMiniMap from "@/components/RegionMiniMap";
+import { BoostDot } from "@/components/BoostDot";
 import { useRegions } from "@/context/RegionContext";
+import { useNowSeconds } from "@/hooks/useNow";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
+import { BOOST_META_LIST } from "@/lib/boosts";
 import logo from "@/assets/logo.png";
-import type { Region } from "@/types/region";
+import { isBoostActive, boostSecondsRemaining, formatBoostCountdown, type Region } from "@/types/region";
 
 const shortAddr = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -40,15 +43,20 @@ const Profile = () => {
     [regions, addr]
   );
 
+  const nowSec = useNowSeconds(30_000);
   const stats = useMemo(() => {
     const blocks = owned.reduce((acc, r) => acc + r.width * r.height, 0);
     const listed = owned.filter((r) => r.isListed).length;
-    const boosts =
-      owned.filter((r) => r.isHighlighted).length +
-      owned.filter((r) => r.hasGlowBorder).length +
-      owned.filter((r) => r.isTrending).length;
+    const boosts = owned.reduce(
+      (acc, r) =>
+        acc +
+        (isBoostActive(r.highlightedAt, nowSec) ? 1 : 0) +
+        (isBoostActive(r.glowingAt, nowSec) ? 1 : 0) +
+        (isBoostActive(r.trendingAt, nowSec) ? 1 : 0),
+      0
+    );
     return { regions: owned.length, blocks, listed, boosts };
-  }, [owned]);
+  }, [owned, nowSec]);
 
   const copyAddress = async () => {
     try {
@@ -191,7 +199,7 @@ const Profile = () => {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {owned.map((r) => (
-                      <RegionCard key={r.id} region={r} onOpen={() => handleOpenRegion(r)} />
+                      <RegionCard key={r.id} region={r} nowSec={nowSec} onOpen={() => handleOpenRegion(r)} />
                     ))}
                   </div>
                 )}
@@ -227,9 +235,10 @@ const StatCard = ({ label, value, loading, accent }: StatCardProps) => (
 interface RegionCardProps {
   region: Region;
   onOpen: () => void;
+  nowSec: number;
 }
 
-const RegionCard = ({ region: r, onOpen }: RegionCardProps) => {
+const RegionCard = ({ region: r, onOpen, nowSec }: RegionCardProps) => {
   const currentPrice =
     r.isListed && r.listing
       ? formatSol(
@@ -242,6 +251,8 @@ const RegionCard = ({ region: r, onOpen }: RegionCardProps) => {
         )
       : null;
   const totalBlocks = r.width * r.height;
+
+  const activeBoosts = BOOST_META_LIST.filter((m) => isBoostActive(m.getAt(r), nowSec));
 
   return (
     <button
@@ -256,11 +267,15 @@ const RegionCard = ({ region: r, onOpen }: RegionCardProps) => {
         ) : (
           <div className="text-muted-foreground text-xs font-mono">No image</div>
         )}
-        {(r.isHighlighted || r.hasGlowBorder || r.isTrending) && (
+        {activeBoosts.length > 0 && (
           <div className="absolute top-1.5 right-1.5 flex gap-1">
-            {r.isHighlighted && <BoostDot color="cyan" icon={<Sparkles className="w-2.5 h-2.5" />} />}
-            {r.hasGlowBorder && <BoostDot color="purple" icon={<Zap className="w-2.5 h-2.5" />} />}
-            {r.isTrending && <BoostDot color="orange" icon={<TrendingUp className="w-2.5 h-2.5" />} />}
+            {activeBoosts.map((m) => (
+              <BoostDot
+                key={m.kind}
+                meta={m}
+                title={`${m.label} · ${formatBoostCountdown(boostSecondsRemaining(m.getAt(r), nowSec))}`}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -296,19 +311,6 @@ const RegionCard = ({ region: r, onOpen }: RegionCardProps) => {
         </div>
       </div>
     </button>
-  );
-};
-
-const BoostDot = ({ color, icon }: { color: "cyan" | "purple" | "orange"; icon: React.ReactNode }) => {
-  const cls = {
-    cyan: "bg-cyan-500/90 text-cyan-50 shadow-[0_0_8px_rgba(41,234,196,0.6)]",
-    purple: "bg-purple-500/90 text-purple-50 shadow-[0_0_8px_rgba(153,69,255,0.6)]",
-    orange: "bg-orange-500/90 text-orange-50 shadow-[0_0_8px_rgba(255,140,0,0.6)]",
-  }[color];
-  return (
-    <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center ${cls}`} aria-hidden="true">
-      {icon}
-    </span>
   );
 };
 

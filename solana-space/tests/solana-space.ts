@@ -350,22 +350,25 @@ describe("solana-space", () => {
 
     it("buys Highlighted boost", async () => {
       const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
+      const txTime = Math.floor(Date.now() / 1000);
       await buyBoost(ctx, { payer: owner, asset: asset.publicKey, flags: 1 });
       const [after, state] = await Promise.all([
         lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
         ctx.program.account.boosts.fetch(boosts),
       ]);
       expect(after - before).to.equal(BOOST_PRICE);
-      expect(state.flags).to.equal(1);
+      expect(state.highlightedAt.toNumber()).to.be.closeTo(txTime, 30);
+      expect(state.glowingAt.toNumber()).to.equal(0);
+      expect(state.trendingAt.toNumber()).to.equal(0);
     });
 
-    it("rejects re-buying an already-active boost", async () => {
-      try {
-        await buyBoost(ctx, { payer: owner, asset: asset.publicKey, flags: 1 });
-        expect.fail("should have failed");
-      } catch (e) {
-        expect(extractErrorName(e)).to.equal("BoostAlreadyActive");
-      }
+    it("extends an already-active boost by one duration", async () => {
+      // Boost already active from previous test — re-buying should shift window forward,
+      // not error. Extend policy: new_at = old_at + BOOST_DURATION_SECONDS.
+      const before = await ctx.program.account.boosts.fetch(boosts);
+      await buyBoost(ctx, { payer: owner, asset: asset.publicKey, flags: 1 });
+      const after = await ctx.program.account.boosts.fetch(boosts);
+      expect(after.highlightedAt.toNumber() - before.highlightedAt.toNumber()).to.equal(86_400);
     });
 
     it("rejects unknown flag bit (8)", async () => {
@@ -392,6 +395,7 @@ describe("solana-space", () => {
       });
 
       const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
+      const txTime = Math.floor(Date.now() / 1000);
       await buyBoost(ctx, { payer: b2, asset: a2.publicKey, flags: 7 });
       const [after, state] = await Promise.all([
         lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
@@ -399,7 +403,9 @@ describe("solana-space", () => {
       ]);
       // 3 × 15_000_000 = 45_000_000 lamports
       expect(after - before).to.equal(45_000_000n);
-      expect(state.flags).to.equal(7);
+      expect(state.highlightedAt.toNumber()).to.be.closeTo(txTime, 30);
+      expect(state.glowingAt.toNumber()).to.be.closeTo(txTime, 30);
+      expect(state.trendingAt.toNumber()).to.be.closeTo(txTime, 30);
     });
 
     it("rejects wrong collection pubkey", async () => {

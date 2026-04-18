@@ -42,25 +42,22 @@ export const SOLANA_SPACE_ERROR__METAPLEX_CPI_FAILED = 0x177b; // 6011
 export const SOLANA_SPACE_ERROR__INVALID_COLLECTION = 0x177c; // 6012
 /** InvalidBoostType: Invalid boost type */
 export const SOLANA_SPACE_ERROR__INVALID_BOOST_TYPE = 0x177d; // 6013
-/** BoostAlreadyActive: Boost already active */
-export const SOLANA_SPACE_ERROR__BOOST_ALREADY_ACTIVE = 0x177e; // 6014
 /** NotAssetOwner: Only the NFT owner can create a listing */
-export const SOLANA_SPACE_ERROR__NOT_ASSET_OWNER = 0x177f; // 6015
+export const SOLANA_SPACE_ERROR__NOT_ASSET_OWNER = 0x177e; // 6014
 /** InvalidStartPrice: Listing start price must be greater than zero */
-export const SOLANA_SPACE_ERROR__INVALID_START_PRICE = 0x1780; // 6016
+export const SOLANA_SPACE_ERROR__INVALID_START_PRICE = 0x177f; // 6015
 /** InvalidEndPrice: Listing end price must be greater than zero */
-export const SOLANA_SPACE_ERROR__INVALID_END_PRICE = 0x1781; // 6017
+export const SOLANA_SPACE_ERROR__INVALID_END_PRICE = 0x1780; // 6016
 /** InvalidDuration: Duration must be greater than zero */
-export const SOLANA_SPACE_ERROR__INVALID_DURATION = 0x1782; // 6018
+export const SOLANA_SPACE_ERROR__INVALID_DURATION = 0x1781; // 6017
 /** UnauthorizedCancel: Only the seller can cancel the listing */
-export const SOLANA_SPACE_ERROR__UNAUTHORIZED_CANCEL = 0x1783; // 6019
+export const SOLANA_SPACE_ERROR__UNAUTHORIZED_CANCEL = 0x1782; // 6018
 /** AssetIsListed: NFT is currently listed on the marketplace */
-export const SOLANA_SPACE_ERROR__ASSET_IS_LISTED = 0x1784; // 6020
+export const SOLANA_SPACE_ERROR__ASSET_IS_LISTED = 0x1783; // 6019
 
 export type SolanaSpaceError =
   | typeof SOLANA_SPACE_ERROR__ARITHMETIC_OVERFLOW
   | typeof SOLANA_SPACE_ERROR__ASSET_IS_LISTED
-  | typeof SOLANA_SPACE_ERROR__BOOST_ALREADY_ACTIVE
   | typeof SOLANA_SPACE_ERROR__INVALID_BOOST_TYPE
   | typeof SOLANA_SPACE_ERROR__INVALID_COLLECTION
   | typeof SOLANA_SPACE_ERROR__INVALID_DURATION
@@ -85,7 +82,6 @@ if (process.env.NODE_ENV !== "production") {
   solanaSpaceErrorMessages = {
     [SOLANA_SPACE_ERROR__ARITHMETIC_OVERFLOW]: `Arithmetic overflow in price calculation`,
     [SOLANA_SPACE_ERROR__ASSET_IS_LISTED]: `NFT is currently listed on the marketplace`,
-    [SOLANA_SPACE_ERROR__BOOST_ALREADY_ACTIVE]: `Boost already active`,
     [SOLANA_SPACE_ERROR__INVALID_BOOST_TYPE]: `Invalid boost type`,
     [SOLANA_SPACE_ERROR__INVALID_COLLECTION]: `Invalid collection address`,
     [SOLANA_SPACE_ERROR__INVALID_DURATION]: `Duration must be greater than zero`,

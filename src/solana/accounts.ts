@@ -2,6 +2,7 @@ import {
   getProgramDerivedAddress,
   getAddressEncoder,
   getUtf8Encoder,
+  fetchEncodedAccounts,
   type Address,
   createSolanaRpc,
   createSolanaRpcSubscriptions,
@@ -11,7 +12,7 @@ import {
   fetchMaybeListing,
   fetchMaybeBoosts,
   fetchAllMaybeListing,
-  fetchAllMaybeBoosts,
+  decodeBoosts,
   type Listing,
   type Boosts,
 } from "@/generated/accounts";
@@ -110,11 +111,27 @@ export async function fetchAllListingsAndBoosts(
     Promise.all(assetAddresses.map((a) => getBoostsPda(a))),
   ]);
 
-  // Batch fetch: 2 RPC calls instead of 2*N
-  const [listings, boosts] = await Promise.all([
+  // Batch fetch: 2 RPC calls instead of 2*N.
+  // Boosts are decoded tolerantly: stale on-chain layouts (from pre-migration
+  // program versions) are treated as "not present" instead of crashing the
+  // whole region fetch.
+  const [listings, rawBoosts] = await Promise.all([
     fetchAllMaybeListing(rpc, listingPdas),
-    fetchAllMaybeBoosts(rpc, boostPdas),
+    fetchEncodedAccounts(rpc, boostPdas),
   ]);
+
+  const boosts: MaybeAccount<Boosts>[] = rawBoosts.map((encoded) => {
+    if (!encoded.exists) return encoded as MaybeAccount<Boosts>;
+    try {
+      return decodeBoosts(encoded);
+    } catch (err) {
+      console.warn(
+        `[fetchAllListingsAndBoosts] Skipping boosts account ${encoded.address} with stale layout:`,
+        err instanceof Error ? err.message : err
+      );
+      return { address: encoded.address, exists: false } as MaybeAccount<Boosts>;
+    }
+  });
 
   return { listings, boosts };
 }

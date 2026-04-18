@@ -34,6 +34,8 @@ export interface ActivityEvent {
   assetAddress: string | null;
   /** For execute_purchase: seller (the previous owner). */
   seller?: string | null;
+  /** For buy_boost: the BOOST_* bitflags argument (u8 immediately after discriminator). */
+  boostFlags?: number;
 }
 
 // Each instruction places the Core asset at a known account index.
@@ -125,8 +127,11 @@ export function extractEventsFromTransaction(args: {
       meta.assetIdx != null ? accountKeys[ix.accounts[meta.assetIdx]] ?? null : null;
     const seller =
       meta.sellerIdx != null ? accountKeys[ix.accounts[meta.sellerIdx]] ?? null : null;
+    // buy_boost layout: 8-byte discriminator + u8 boost_flags. Extract the u8.
+    const boostFlags =
+      type === "boost" && data.length >= 9 ? data[8] : undefined;
 
-    events.push({ type, signature, slot, blockTime, actor, assetAddress, seller });
+    events.push({ type, signature, slot, blockTime, actor, assetAddress, seller, boostFlags });
   }
   return events;
 }

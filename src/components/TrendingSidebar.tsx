@@ -1,7 +1,13 @@
 import { useRegions } from "@/context/RegionContext";
 import { TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
-import type { Region } from "@/types/region";
+import {
+  boostSecondsRemaining,
+  formatBoostCountdown,
+  type Region,
+} from "@/types/region";
+import { BOOST_META } from "@/lib/boosts";
+import { useNowSeconds } from "@/hooks/useNow";
 
 interface Props {
   onSelectRegion: (region: Region) => void;
@@ -11,6 +17,7 @@ interface Props {
 
 const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props) => {
   const { trendingRegions } = useRegions();
+  const nowSec = useNowSeconds(1000);
 
   if (trendingRegions.length === 0) return null;
 
@@ -80,6 +87,9 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
                       SOL
                     </p>
                   )}
+                  <p className={`text-[10px] font-mono ${BOOST_META.trending.iconClass}`}>
+                    {formatBoostCountdown(boostSecondsRemaining(r.trendingAt, nowSec))}
+                  </p>
                 </div>
               </div>
             </button>

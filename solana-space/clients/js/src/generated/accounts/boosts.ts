@@ -19,6 +19,8 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   getU8Decoder,
@@ -49,19 +51,39 @@ export type Boosts = {
   discriminator: ReadonlyUint8Array;
   /** The asset this boost record belongs to */
   asset: Address;
-  /** Bitflags: bit 0 = Highlighted, bit 1 = Glowing, bit 2 = Trending */
-  flags: number;
   /** Bump seed for this PDA */
   bump: number;
+  /**
+   * Unix seconds marking the start of the currently-valid Highlight window.
+   * 0 = never purchased.
+   * Active iff `now - highlighted_at < BOOST_DURATION_SECONDS`.
+   * On re-buy while still active, this is advanced by one `BOOST_DURATION_SECONDS`
+   * so the live window extends forward rather than resetting — users never lose paid time.
+   */
+  highlightedAt: bigint;
+  /** See `highlighted_at`. */
+  glowingAt: bigint;
+  /** See `highlighted_at`. */
+  trendingAt: bigint;
 };
 
 export type BoostsArgs = {
   /** The asset this boost record belongs to */
   asset: Address;
-  /** Bitflags: bit 0 = Highlighted, bit 1 = Glowing, bit 2 = Trending */
-  flags: number;
   /** Bump seed for this PDA */
   bump: number;
+  /**
+   * Unix seconds marking the start of the currently-valid Highlight window.
+   * 0 = never purchased.
+   * Active iff `now - highlighted_at < BOOST_DURATION_SECONDS`.
+   * On re-buy while still active, this is advanced by one `BOOST_DURATION_SECONDS`
+   * so the live window extends forward rather than resetting — users never lose paid time.
+   */
+  highlightedAt: number | bigint;
+  /** See `highlighted_at`. */
+  glowingAt: number | bigint;
+  /** See `highlighted_at`. */
+  trendingAt: number | bigint;
 };
 
 /** Gets the encoder for {@link BoostsArgs} account data. */
@@ -70,8 +92,10 @@ export function getBoostsEncoder(): FixedSizeEncoder<BoostsArgs> {
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["asset", getAddressEncoder()],
-      ["flags", getU8Encoder()],
       ["bump", getU8Encoder()],
+      ["highlightedAt", getI64Encoder()],
+      ["glowingAt", getI64Encoder()],
+      ["trendingAt", getI64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: BOOSTS_DISCRIMINATOR }),
   );
@@ -82,8 +106,10 @@ export function getBoostsDecoder(): FixedSizeDecoder<Boosts> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["asset", getAddressDecoder()],
-    ["flags", getU8Decoder()],
     ["bump", getU8Decoder()],
+    ["highlightedAt", getI64Decoder()],
+    ["glowingAt", getI64Decoder()],
+    ["trendingAt", getI64Decoder()],
   ]);
 }
 
@@ -146,5 +172,5 @@ export async function fetchAllMaybeBoosts(
 }
 
 export function getBoostsSize(): number {
-  return 42;
+  return 65;
 }

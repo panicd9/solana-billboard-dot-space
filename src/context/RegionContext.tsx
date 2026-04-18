@@ -7,7 +7,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { GRID_COLS, GRID_ROWS, type Region, type Selection } from "@/types/region";
+import { GRID_COLS, GRID_ROWS, isBoostActive, type Region, type Selection } from "@/types/region";
 import { useCanvasState } from "@/hooks/useCanvasState";
 import { useOnChainRegions } from "@/hooks/useOnChainRegions";
 import { useAnimatedImages, type AnimatedImage } from "@/hooks/useAnimatedImages";
@@ -176,10 +176,9 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         isListed: false,
         listing: null,
         createdAt: 0,
-        boostFlags: 0,
-        isHighlighted: false,
-        hasGlowBorder: false,
-        isTrending: false,
+        highlightedAt: 0n,
+        glowingAt: 0n,
+        trendingAt: 0n,
       };
     },
     [regions, occupancy]
@@ -239,10 +238,9 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         isListed: false,
         listing: null,
         createdAt: Date.now(),
-        boostFlags: 0,
-        isHighlighted: false,
-        hasGlowBorder: false,
-        isTrending: false,
+        highlightedAt: 0n,
+        glowingAt: 0n,
+        trendingAt: 0n,
       };
     },
     [mintMutation]
@@ -303,9 +301,18 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
     [buyBoostMutation]
   );
 
+  // Re-evaluate Trending membership every 30s so expired boosts drop off without a refetch.
+  const [trendingTick, setTrendingTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTrendingTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const trendingRegions = useMemo(
-    () => regions.filter((r) => r.isTrending),
-    [regions]
+    () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      return regions.filter((r) => isBoostActive(r.trendingAt, nowSec));
+    },
+    [regions, trendingTick]
   );
 
   const isLoading = canvasState.isLoading || regionsQuery.isLoading;

@@ -12,6 +12,7 @@ import {
   BOOST_GLOWING,
   BOOST_TRENDING,
 } from "@/solana/constants";
+import { BOOST_DURATION_SECONDS, isBoostActive } from "@/types/region";
 import { ipfsToGateway } from "@/solana/accounts";
 
 function useWalletSigner(): TransactionSigner | null {
@@ -85,10 +86,9 @@ export function useMintRegion() {
         isListed: false,
         listing: null,
         createdAt: Date.now(),
-        boostFlags: 0,
-        isHighlighted: false,
-        hasGlowBorder: false,
-        isTrending: false,
+        highlightedAt: 0n,
+        glowingAt: 0n,
+        trendingAt: 0n,
       };
       queryClient.setQueryData<Region[]>(
         ["regions", COLLECTION_ADDRESS],
@@ -292,13 +292,18 @@ export function useBuyBoost() {
     onSuccess: (_data, variables) => {
       toast.success("Boost activated!");
       patchRegion(queryClient, variables.assetAddress, (r) => {
-        const newFlags = r.boostFlags | variables.boostFlags;
+        // Mirror on-chain extend policy: if still active, advance by one duration; else reset to now.
+        const nowSec = Math.floor(Date.now() / 1000);
+        const extend = (at: bigint): bigint =>
+          isBoostActive(at, nowSec)
+            ? at + BigInt(BOOST_DURATION_SECONDS)
+            : BigInt(nowSec);
+        const f = variables.boostFlags;
         return {
           ...r,
-          boostFlags: newFlags,
-          isHighlighted: (newFlags & BOOST_HIGHLIGHTED) !== 0,
-          hasGlowBorder: (newFlags & BOOST_GLOWING) !== 0,
-          isTrending: (newFlags & BOOST_TRENDING) !== 0,
+          highlightedAt: f & BOOST_HIGHLIGHTED ? extend(r.highlightedAt) : r.highlightedAt,
+          glowingAt: f & BOOST_GLOWING ? extend(r.glowingAt) : r.glowingAt,
+          trendingAt: f & BOOST_TRENDING ? extend(r.trendingAt) : r.trendingAt,
         };
       });
       queryClient.invalidateQueries({ queryKey: ["regions"] });
