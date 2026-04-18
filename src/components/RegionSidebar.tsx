@@ -200,7 +200,7 @@ const RegionSidebar = () => {
               </span>
             );
           })}
-          <Tooltip>
+          <Tooltip delayDuration={150}>
             <TooltipTrigger asChild>
               <button
                 type="button"
