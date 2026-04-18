@@ -3,11 +3,13 @@ import type { Address } from "@solana/kit";
 import type { Region } from "@/types/region";
 import {
   fetchAllCoreAssets,
+  fetchCoreAssetsByAddresses,
   parseRegionAttributes,
   ipfsToGateway,
   fetchAllListingsAndBoosts,
 } from "@/solana/accounts";
 import { COLLECTION_ADDRESS } from "@/solana/constants";
+import { config } from "@/config/env";
 
 /**
  * Decode a Metaplex Core V1 asset's raw data to extract owner and name.
@@ -126,6 +128,45 @@ function tryParseAttributesPlugin(
   return null;
 }
 
+// On localnet, surfpool merges local state with its upstream RPC and the
+// getProgramAccounts scan against MPL Core on the upstream is painfully slow
+// (~25s against public mainnet-beta). `seed-local.ts` writes the minted asset
+// addresses to /seed-assets.json, which lets us bypass the scan entirely and
+// hit getMultipleAccounts instead. Mainnet/devnet still go through the normal
+// getProgramAccounts path.
+type CoreAssetRow = {
+  pubkey: string;
+  account: { data: unknown };
+};
+
+async function fetchCoreAssetsForCurrentNetwork(): Promise<CoreAssetRow[]> {
+  if (config.network === "localnet") {
+    try {
+      const res = await fetch("/seed-assets.json", { cache: "no-store" });
+      if (res.ok) {
+        const manifest = (await res.json()) as {
+          collection?: string;
+          assets?: string[];
+        };
+        if (
+          manifest.collection === COLLECTION_ADDRESS &&
+          manifest.assets?.length
+        ) {
+          console.log(
+            `[useOnChainRegions] localnet bypass: fetching ${manifest.assets.length} seeded assets via getMultipleAccounts`
+          );
+          return (await fetchCoreAssetsByAddresses(
+            manifest.assets as Address[]
+          )) as unknown as CoreAssetRow[];
+        }
+      }
+    } catch (err) {
+      console.warn("[useOnChainRegions] localnet bypass unavailable:", err);
+    }
+  }
+  return (await fetchAllCoreAssets(COLLECTION_ADDRESS)) as unknown as CoreAssetRow[];
+}
+
 export function useOnChainRegions() {
   return useQuery({
     queryKey: ["regions", COLLECTION_ADDRESS],
@@ -135,7 +176,7 @@ export function useOnChainRegions() {
         return [];
       }
 
-      const accounts = await fetchAllCoreAssets(COLLECTION_ADDRESS);
+      const accounts = await fetchCoreAssetsForCurrentNetwork();
       console.log(`[useOnChainRegions] Fetched ${accounts.length} Core assets`);
 
       // Parse all account data synchronously first

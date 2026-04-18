@@ -219,6 +219,26 @@ export async function fetchAllCoreAssets(collectionAddress: string) {
   return accounts;
 }
 
+/**
+ * Localnet-only bypass for the slow surfpool-proxied getProgramAccounts scan on
+ * MPL Core. Fetches a known list of asset addresses via getMultipleAccounts and
+ * returns them in the same `{ pubkey, account: { data } }` shape as
+ * `fetchAllCoreAssets` so the caller is unchanged.
+ */
+export async function fetchCoreAssetsByAddresses(addresses: Address[]) {
+  if (addresses.length === 0) return [];
+  const rpc = getRpc();
+
+  const res = await rpc
+    .getMultipleAccounts(addresses, { encoding: "base64" })
+    .send();
+
+  return res.value.flatMap((acc, i) => {
+    if (!acc) return [];
+    return [{ pubkey: addresses[i], account: acc }];
+  });
+}
+
 // ---- IPFS helper ----
 
 export function ipfsToGateway(uri: string): string {

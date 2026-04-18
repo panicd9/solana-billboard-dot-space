@@ -115,7 +115,12 @@ async function confirm(rpc: Rpc, sig: string): Promise<void> {
   for (let i = 0; i < 40; i++) {
     const res = await rpc.getSignatureStatuses([sig as Signature]).send();
     const s = res.value[0];
-    if (s?.err) throw new Error(`tx ${sig} failed: ${JSON.stringify(s.err)}`);
+    if (s?.err)
+      throw new Error(
+        `tx ${sig} failed: ${JSON.stringify(s.err, (_k, v) =>
+          typeof v === "bigint" ? v.toString() : v,
+        )}`,
+      );
     if (s?.confirmationStatus === "confirmed" || s?.confirmationStatus === "finalized") return;
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -206,7 +211,17 @@ async function main() {
     console.log(`✓ boost ${a.address.slice(0, 8)}…  ${flags.join(" | ")}`);
   }
 
-  // 5. Write .env.local for the frontend to pick up
+  // 5. Write the asset-address list to public/seed-assets.json so the frontend
+  // can bypass the slow surfpool-proxied getProgramAccounts on localnet.
+  const seedManifest = {
+    collection: collectionSigner.address,
+    assets: assets.map((a) => a.address),
+  };
+  const seedPath = path.join(PROJECT_ROOT, "public", "seed-assets.json");
+  fs.writeFileSync(seedPath, JSON.stringify(seedManifest, null, 2) + "\n", "utf-8");
+  console.log(`Wrote ${seedPath}`);
+
+  // 6. Write .env.local for the frontend to pick up
   const wsUrl = RPC_URL.replace(/^http/, "ws").replace(":8899", ":8900");
   if (WRITE_ENV) {
     const envPath = path.join(PROJECT_ROOT, ".env.local");
