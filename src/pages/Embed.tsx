@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { ExternalLink, Tag, Sparkles, Zap, TrendingUp } from "lucide-react";
 import RegionMiniMap from "@/components/RegionMiniMap";
 import { useRegions } from "@/context/RegionContext";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import logo from "@/assets/logo.png";
 
 const Embed = () => {
@@ -23,7 +23,7 @@ const Embed = () => {
 
   const currentPrice =
     region?.isListed && region.listing
-      ? formatUsdc(
+      ? formatSol(
           calculateListingCurrentPrice(
             region.listing.startPrice,
             region.listing.endPrice,
@@ -102,7 +102,7 @@ const Embed = () => {
               <div className={currentPrice ? "text-accent" : "text-muted-foreground"}>
                 {currentPrice ? (
                   <span className="inline-flex items-center gap-1">
-                    <Tag className="w-2.5 h-2.5" /> {currentPrice} USDC
+                    <Tag className="w-2.5 h-2.5" /> {currentPrice} SOL
                   </span>
                 ) : (
                   "Unlisted"

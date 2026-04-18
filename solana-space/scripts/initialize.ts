@@ -16,8 +16,7 @@ if (!globalThis.crypto) {
  *
  * Env vars (or pass as CLI args):
  *   RPC_URL          — defaults to http://127.0.0.1:8899
- *   USDC_MINT        — defaults to USDC-dev (Gh9Zw...tKJr)
- *   TREASURY_ATA     — defaults to ATA of local keypair for USDC-dev
+ *   TREASURY         — SOL recipient wallet (defaults to authority pubkey)
  *   KEYPAIR_PATH     — defaults to ~/.config/solana/id.json
  */
 
@@ -47,15 +46,6 @@ const KEYPAIR_PATH =
   process.env.KEYPAIR_PATH ??
   path.join(os.homedir(), ".config", "solana", "id.json");
 
-// USDC-dev mint (Circle devnet faucet) — used on both devnet and localnet
-const USDC_DEV_MINT_DEFAULT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr";
-
-const USDC_MINT = process.env.USDC_MINT ?? USDC_DEV_MINT_DEFAULT;
-
-// Default treasury ATA: AZosm5...GKTf wallet's ATA for USDC-dev mint
-const TREASURY_ATA_DEFAULT = "4S5XQkjEEjekgBvvaJf7eiaqs6g8GHtkjt2CA9UQPWWE";
-const TREASURY_ATA = process.env.TREASURY_ATA ?? TREASURY_ATA_DEFAULT;
-
 // ── Helpers ─────────────────────────────────────────────────────────
 
 async function loadKeypairSigner(keypairPath: string) {
@@ -70,15 +60,15 @@ async function main() {
   console.log("=== Initialize Solana Space Program ===");
   console.log(`RPC:      ${RPC_URL}`);
   console.log(`Keypair:  ${KEYPAIR_PATH}`);
-  console.log(`USDC:     ${USDC_MINT}`);
-  console.log(`Treasury: ${TREASURY_ATA}`);
-  console.log();
 
   const rpc = createSolanaRpc(RPC_URL);
 
   // Load authority keypair
   const authority = await loadKeypairSigner(KEYPAIR_PATH);
   console.log(`Authority: ${authority.address}`);
+
+  const treasury = (process.env.TREASURY ?? authority.address) as Address;
+  console.log(`Treasury: ${treasury}`);
 
   // Generate fresh keypair for the collection account
   const collectionSigner = await generateKeyPairSigner();
@@ -90,8 +80,7 @@ async function main() {
   const ix = await getInitializeInstructionAsync({
     authority,
     collection: collectionSigner,
-    treasury: TREASURY_ATA as Address,
-    usdcMint: USDC_MINT as Address,
+    treasury,
     collectionUri: "https://solanabillboard.space/collection.json",
   });
 
@@ -121,9 +110,11 @@ async function main() {
   console.log("=== Initialization Complete ===");
   console.log(`Signature:  ${sigStr}`);
   console.log(`Collection: ${collectionSigner.address}`);
+  console.log(`Treasury:   ${treasury}`);
   console.log();
   console.log("Add to your .env:");
   console.log(`  VITE_COLLECTION_ADDRESS=${collectionSigner.address}`);
+  console.log(`  VITE_TREASURY=${treasury}`);
 }
 
 main().catch((err) => {

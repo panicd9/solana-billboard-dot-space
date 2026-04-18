@@ -30,8 +30,8 @@ export const SOLANA_SPACE_ERROR__REGION_OCCUPIED = 0x1775; // 6005
 export const SOLANA_SPACE_ERROR__URI_TOO_LONG = 0x1776; // 6006
 /** LinkTooLong: Link exceeds maximum length */
 export const SOLANA_SPACE_ERROR__LINK_TOO_LONG = 0x1777; // 6007
-/** InvalidUsdcMint: Invalid USDC mint address */
-export const SOLANA_SPACE_ERROR__INVALID_USDC_MINT = 0x1778; // 6008
+/** InvalidTreasury: Invalid treasury account */
+export const SOLANA_SPACE_ERROR__INVALID_TREASURY = 0x1778; // 6008
 /** ArithmeticOverflow: Arithmetic overflow in price calculation */
 export const SOLANA_SPACE_ERROR__ARITHMETIC_OVERFLOW = 0x1779; // 6009
 /** UnauthorizedOwner: Only the NFT owner can update the region */
@@ -67,7 +67,7 @@ export type SolanaSpaceError =
   | typeof SOLANA_SPACE_ERROR__INVALID_END_PRICE
   | typeof SOLANA_SPACE_ERROR__INVALID_HEIGHT
   | typeof SOLANA_SPACE_ERROR__INVALID_START_PRICE
-  | typeof SOLANA_SPACE_ERROR__INVALID_USDC_MINT
+  | typeof SOLANA_SPACE_ERROR__INVALID_TREASURY
   | typeof SOLANA_SPACE_ERROR__INVALID_WIDTH
   | typeof SOLANA_SPACE_ERROR__INVALID_X_COORDINATE
   | typeof SOLANA_SPACE_ERROR__INVALID_Y_COORDINATE
@@ -92,7 +92,7 @@ if (process.env.NODE_ENV !== "production") {
     [SOLANA_SPACE_ERROR__INVALID_END_PRICE]: `Listing end price must be greater than zero`,
     [SOLANA_SPACE_ERROR__INVALID_HEIGHT]: `Region height must be at least 1`,
     [SOLANA_SPACE_ERROR__INVALID_START_PRICE]: `Listing start price must be greater than zero`,
-    [SOLANA_SPACE_ERROR__INVALID_USDC_MINT]: `Invalid USDC mint address`,
+    [SOLANA_SPACE_ERROR__INVALID_TREASURY]: `Invalid treasury account`,
     [SOLANA_SPACE_ERROR__INVALID_WIDTH]: `Region width must be at least 1`,
     [SOLANA_SPACE_ERROR__INVALID_X_COORDINATE]: `Region X coordinate out of bounds`,
     [SOLANA_SPACE_ERROR__INVALID_Y_COORDINATE]: `Region Y coordinate out of bounds`,

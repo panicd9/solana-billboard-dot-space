@@ -93,13 +93,11 @@ export type InitializeInstruction<
 export type InitializeInstructionData = {
   discriminator: ReadonlyUint8Array;
   treasury: Address;
-  usdcMint: Address;
   collectionUri: string;
 };
 
 export type InitializeInstructionDataArgs = {
   treasury: Address;
-  usdcMint: Address;
   collectionUri: string;
 };
 
@@ -108,7 +106,6 @@ export function getInitializeInstructionDataEncoder(): Encoder<InitializeInstruc
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["treasury", getAddressEncoder()],
-      ["usdcMint", getAddressEncoder()],
       [
         "collectionUri",
         addEncoderSizePrefix(getUtf8Encoder(), getU32Encoder()),
@@ -122,7 +119,6 @@ export function getInitializeInstructionDataDecoder(): Decoder<InitializeInstruc
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["treasury", getAddressDecoder()],
-    ["usdcMint", getAddressDecoder()],
     ["collectionUri", addDecoderSizePrefix(getUtf8Decoder(), getU32Decoder())],
   ]);
 }
@@ -151,7 +147,6 @@ export type InitializeAsyncInput<
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   treasury: InitializeInstructionDataArgs["treasury"];
-  usdcMint: InitializeInstructionDataArgs["usdcMint"];
   collectionUri: InitializeInstructionDataArgs["collectionUri"];
 };
 
@@ -255,7 +250,6 @@ export type InitializeInput<
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   treasury: InitializeInstructionDataArgs["treasury"];
-  usdcMint: InitializeInstructionDataArgs["usdcMint"];
   collectionUri: InitializeInstructionDataArgs["collectionUri"];
 };
 

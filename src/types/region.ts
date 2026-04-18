@@ -16,7 +16,7 @@ export interface Region {
   imageUrl: string; // IPFS gateway URL for display
   imageUri: string; // on-chain URI (ipfs://...)
   linkUrl: string;
-  purchasePrice: number; // USDC (display value)
+  purchasePrice: number; // SOL (display value)
   isListed: boolean;
   listing: ListingInfo | null;
   createdAt: number;
@@ -39,7 +39,4 @@ export const BLOCK_SIZE = 10;
 export const CANVAS_W = GRID_COLS * BLOCK_SIZE;
 export const CANVAS_H = GRID_ROWS * BLOCK_SIZE;
 
-// Boost costs in USDC (display values)
-export const HIGHLIGHT_COST_USDC = 1.0;
-export const GLOW_COST_USDC = 2.0;
-export const TRENDING_COST_USDC = 5.0;
+export const BOOST_COST_SOL = 0.015;

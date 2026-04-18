@@ -3,7 +3,7 @@ import { ArrowUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRegions } from "@/context/RegionContext";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import RegionMiniMap from "@/components/RegionMiniMap";
 
 interface Props {
@@ -123,7 +123,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
             {sorted.map((r) => {
               const currentPrice =
                 r.isListed && r.listing
-                  ? formatUsdc(
+                  ? formatSol(
                       calculateListingCurrentPrice(
                         r.listing.startPrice,
                         r.listing.endPrice,
@@ -142,7 +142,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                     setSelectedRegion(r);
                     onHighlightRegion(r.id);
                   }}
-                  aria-label={`Region at ${r.startX},${r.startY}, ${r.width} by ${r.height}, ${currentPrice ? `listed at ${currentPrice} USDC` : "not listed"}`}
+                  aria-label={`Region at ${r.startX},${r.startY}, ${r.width} by ${r.height}, ${currentPrice ? `listed at ${currentPrice} SOL` : "not listed"}`}
                 >
                   <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden">
                     {r.imageUrl ? (
@@ -178,7 +178,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Status</span>
                       <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
-                        {currentPrice ? `Listed @ ${currentPrice} USDC` : "Unlisted"}
+                        {currentPrice ? `Listed @ ${currentPrice} SOL` : "Unlisted"}
                       </span>
                     </div>
                   </div>

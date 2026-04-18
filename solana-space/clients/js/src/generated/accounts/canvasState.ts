@@ -53,10 +53,8 @@ export type CanvasState = {
   discriminator: ReadonlyUint8Array;
   /** The admin authority that initialized the canvas */
   authority: Address;
-  /** Treasury wallet that receives USDC payments */
+  /** Treasury wallet that receives SOL payments (mint, boost, marketplace fee) */
   treasury: Address;
-  /** USDC mint address */
-  usdcMint: Address;
   /** Metaplex Core Collection address */
   collection: Address;
   /** Total regions minted */
@@ -78,10 +76,8 @@ export type CanvasState = {
 export type CanvasStateArgs = {
   /** The admin authority that initialized the canvas */
   authority: Address;
-  /** Treasury wallet that receives USDC payments */
+  /** Treasury wallet that receives SOL payments (mint, boost, marketplace fee) */
   treasury: Address;
-  /** USDC mint address */
-  usdcMint: Address;
   /** Metaplex Core Collection address */
   collection: Address;
   /** Total regions minted */
@@ -107,7 +103,6 @@ export function getCanvasStateEncoder(): FixedSizeEncoder<CanvasStateArgs> {
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["authority", getAddressEncoder()],
       ["treasury", getAddressEncoder()],
-      ["usdcMint", getAddressEncoder()],
       ["collection", getAddressEncoder()],
       ["totalMinted", getU32Encoder()],
       ["curveBlocksSold", getU32Encoder()],
@@ -125,7 +120,6 @@ export function getCanvasStateDecoder(): FixedSizeDecoder<CanvasState> {
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["authority", getAddressDecoder()],
     ["treasury", getAddressDecoder()],
-    ["usdcMint", getAddressDecoder()],
     ["collection", getAddressDecoder()],
     ["totalMinted", getU32Decoder()],
     ["curveBlocksSold", getU32Decoder()],
@@ -197,5 +191,5 @@ export async function fetchAllMaybeCanvasState(
 }
 
 export function getCanvasStateSize(): number {
-  return 2740;
+  return 2708;
 }

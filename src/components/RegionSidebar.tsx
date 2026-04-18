@@ -31,15 +31,14 @@ import {
 } from "@/components/ui/select";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
+import { BOOST_COST_SOL } from "@/types/region";
 import {
-  BLOCK_SIZE,
-  HIGHLIGHT_COST_USDC,
-  GLOW_COST_USDC,
-  TRENDING_COST_USDC,
-} from "@/types/region";
-import { BOOST_HIGHLIGHTED, BOOST_GLOWING, BOOST_TRENDING } from "@/solana/constants";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
-import { USDC_DECIMALS } from "@/solana/constants";
+  BOOST_HIGHLIGHTED,
+  BOOST_GLOWING,
+  BOOST_TRENDING,
+  SOL_DECIMALS,
+} from "@/solana/constants";
+import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import { useWalletConnection } from "@solana/react-hooks";
 
 const RegionSidebar = () => {
@@ -120,8 +119,8 @@ const RegionSidebar = () => {
       toast.error("Enter a valid duration");
       return;
     }
-    const spLamports = BigInt(Math.round(sp * 10 ** USDC_DECIMALS));
-    const epLamports = BigInt(Math.round(ep * 10 ** USDC_DECIMALS));
+    const spLamports = BigInt(Math.round(sp * 10 ** SOL_DECIMALS));
+    const epLamports = BigInt(Math.round(ep * 10 ** SOL_DECIMALS));
     withBusy("list", () => listRegion(r.id, spLamports, epLamports, BigInt(dur)));
   };
 
@@ -242,7 +241,7 @@ const RegionSidebar = () => {
           <span className="text-muted-foreground">Status</span>
           <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
             {currentListingPrice !== null
-              ? `Listed @ ${formatUsdc(currentListingPrice)} USDC`
+              ? `Listed @ ${formatSol(currentListingPrice)} SOL`
               : "Not listed"}
           </span>
         </div>
@@ -391,7 +390,7 @@ const RegionSidebar = () => {
             )}
             {r.isHighlighted
               ? "Highlighted"
-              : `Highlight (${HIGHLIGHT_COST_USDC} USDC)`}
+              : `Highlight (${BOOST_COST_SOL} SOL)`}
           </Button>
           <Button
             variant="outline"
@@ -407,7 +406,7 @@ const RegionSidebar = () => {
             )}
             {r.hasGlowBorder
               ? "Glowing"
-              : `Border Glow (${GLOW_COST_USDC} USDC)`}
+              : `Border Glow (${BOOST_COST_SOL} SOL)`}
           </Button>
           <Button
             variant="outline"
@@ -423,7 +422,7 @@ const RegionSidebar = () => {
             )}
             {r.isTrending
               ? "Trending"
-              : `Pin Trending (${TRENDING_COST_USDC} USDC)`}
+              : `Pin Trending (${BOOST_COST_SOL} SOL)`}
           </Button>
         </div>
       )}
@@ -460,7 +459,7 @@ const RegionSidebar = () => {
                 ) : (
                   <ShoppingCart className="w-4 h-4" />
                 )}
-                Buy for {formatUsdc(currentListingPrice)} USDC
+                Buy for {formatSol(currentListingPrice)} SOL
               </Button>
             )}
           </>
@@ -470,13 +469,13 @@ const RegionSidebar = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="listing-start-price" className="sr-only">
-                    Start price in USDC
+                    Start price in SOL
                   </label>
                   <input
                     id="listing-start-price"
                     type="number"
-                    step="0.01"
-                    placeholder="Start (USDC)"
+                    step="0.001"
+                    placeholder="Start (SOL)"
                     value={startPrice}
                     onChange={(e) => setStartPrice(e.target.value)}
                     className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -484,13 +483,13 @@ const RegionSidebar = () => {
                 </div>
                 <div>
                   <label htmlFor="listing-end-price" className="sr-only">
-                    End price in USDC
+                    End price in SOL
                   </label>
                   <input
                     id="listing-end-price"
                     type="number"
-                    step="0.01"
-                    placeholder="End (USDC)"
+                    step="0.001"
+                    placeholder="End (SOL)"
                     value={endPrice}
                     onChange={(e) => setEndPrice(e.target.value)}
                     className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"

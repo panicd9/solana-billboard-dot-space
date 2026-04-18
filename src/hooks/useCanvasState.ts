@@ -11,7 +11,6 @@ export function useCanvasState() {
       return {
         authority: account.data.authority,
         treasury: account.data.treasury,
-        usdcMint: account.data.usdcMint,
         collection: account.data.collection,
         totalMinted: account.data.totalMinted,
         curveBlocksSold: account.data.curveBlocksSold,

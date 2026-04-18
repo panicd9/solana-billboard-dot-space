@@ -1,7 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    self, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_lang::system_program::{self, Transfer};
 use mpl_core::{
     instructions::CreateV2CpiBuilder,
     types::{Attribute, Attributes, Plugin, PluginAuthority, PluginAuthorityPair},
@@ -42,23 +40,10 @@ pub struct MintRegion<'info> {
     #[account(mut)]
     pub collection: AccountInfo<'info>,
 
-    // --- USDC payment accounts ---
-    pub usdc_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        mut,
-        associated_token::mint = usdc_mint,
-        associated_token::authority = payer,
-    )]
-    pub payer_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        token::mint = usdc_mint,
-    )]
-    pub treasury_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    pub token_program: Interface<'info, TokenInterface>,
+    /// SOL recipient for the mint payment.
+    /// CHECK: Validated in handler against canvas_state.treasury.
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
 
     /// CHECK: Metaplex Core program
     #[account(address = mpl_core::ID)]
@@ -91,15 +76,9 @@ fn count_center_and_curve_blocks(x: u16, y: u16, width: u16, height: u16) -> (u6
     (center_count, curve_count)
 }
 
-/// Calculate total price for a rectangular region using:
+/// Calculate total price (in SOL lamports) for a rectangular region using:
 /// - Fixed price for center zone blocks
 /// - Linear bonding curve for all other blocks
-///
-/// Bonding curve: price(n) = START + (END - START) * n / (TOTAL - 1)
-/// where n = the nth non-center block sold (0-indexed).
-///
-/// For k new curve blocks starting at supply s, the sum is:
-///   k * START + (END - START) * (k * s + k * (k - 1) / 2) / (TOTAL - 1)
 fn calculate_region_price(
     x: u16,
     y: u16,
@@ -109,12 +88,10 @@ fn calculate_region_price(
 ) -> Result<u64> {
     let (center_count, curve_count) = count_center_and_curve_blocks(x, y, width, height);
 
-    // Center zone: fixed price
     let center_total = (center_count as u128)
         .checked_mul(CENTER_PRICE_PER_BLOCK as u128)
         .ok_or(ErrorCode::ArithmeticOverflow)?;
 
-    // Bonding curve: sum of arithmetic sequence
     let curve_total = if curve_count == 0 {
         0u128
     } else {
@@ -122,9 +99,8 @@ fn calculate_region_price(
         let s = curve_blocks_sold as u128;
         let start = CURVE_START_PRICE as u128;
         let end = CURVE_END_PRICE as u128;
-        let divisor = (CURVE_TOTAL_BLOCKS - 1) as u128; // 18695
+        let divisor = (CURVE_TOTAL_BLOCKS - 1) as u128;
 
-        // Sum = k * start + (end - start) * (k * s + k * (k - 1) / 2) / divisor
         let base = k.checked_mul(start).ok_or(ErrorCode::ArithmeticOverflow)?;
         let seq_sum = k
             .checked_mul(s)
@@ -162,7 +138,7 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
     require!(args.image_uri.len() <= MAX_URI_LENGTH, ErrorCode::UriTooLong);
     require!(args.link.len() <= MAX_LINK_LENGTH, ErrorCode::LinkTooLong);
 
-    // 2. Validate collection and usdc_mint, check bitmap, read current curve supply
+    // 2. Validate collection + treasury, check bitmap, read curve supply
     let curve_blocks_sold = {
         let canvas_state = ctx.accounts.canvas_state.load()?;
         require!(
@@ -170,11 +146,7 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
             ErrorCode::InvalidCollection
         );
         require!(
-            ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
-            ErrorCode::InvalidUsdcMint
-        );
-        require!(
-            ctx.accounts.treasury_usdc_ata.owner == canvas_state.treasury,
+            ctx.accounts.treasury.key() == canvas_state.treasury,
             ErrorCode::InvalidTreasury
         );
         require!(
@@ -184,19 +156,19 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
         canvas_state.curve_blocks_sold
     };
 
-    // 3. Calculate total price (center = fixed, outside = bonding curve)
+    // 3. Calculate total price
     let total_price =
         calculate_region_price(args.x, args.y, args.width, args.height, curve_blocks_sold)?;
 
-    // 4. Transfer USDC from payer to treasury
-    let transfer_accounts = TransferChecked {
-        from: ctx.accounts.payer_usdc_ata.to_account_info(),
-        mint: ctx.accounts.usdc_mint.to_account_info(),
-        to: ctx.accounts.treasury_usdc_ata.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
-    };
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_accounts);
-    token_interface::transfer_checked(cpi_ctx, total_price, USDC_DECIMALS)?;
+    // 4. Transfer SOL from payer to treasury
+    let cpi_ctx = CpiContext::new(
+        ctx.accounts.system_program.to_account_info(),
+        Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.treasury.to_account_info(),
+        },
+    );
+    system_program::transfer(cpi_ctx, total_price)?;
 
     // 5. Mark bitmap as occupied and update counters
     let bump = {

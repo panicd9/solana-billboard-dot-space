@@ -26,10 +26,7 @@ pub enum ErrorCode {
     #[msg("Link exceeds maximum length")]
     LinkTooLong,
 
-    #[msg("Invalid USDC mint address")]
-    InvalidUsdcMint,
-
-    #[msg("Invalid treasury USDC account")]
+    #[msg("Invalid treasury account")]
     InvalidTreasury,
 
     #[msg("Arithmetic overflow in price calculation")]

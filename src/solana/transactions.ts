@@ -8,8 +8,6 @@ import {
   sendAndConfirmTransactionFactory,
   getSignatureFromTransaction,
   generateKeyPairSigner,
-  getAddressEncoder,
-  getProgramDerivedAddress,
   type TransactionSigner,
   type Address,
   type Instruction,
@@ -23,7 +21,7 @@ import {
   getExecutePurchaseInstructionAsync,
   getBuyBoostInstructionAsync,
 } from "@/generated/instructions";
-import { COLLECTION_ADDRESS, USDC_MINT, TREASURY_USDC_ATA } from "./constants";
+import { COLLECTION_ADDRESS, TREASURY } from "./constants";
 import { getRpc, getRpcSubscriptions } from "./accounts";
 
 const COMPUTE_BUDGET_PROGRAM =
@@ -117,8 +115,7 @@ export async function mintRegion(
     payer: signer,
     asset: assetSigner,
     collection: COLLECTION_ADDRESS,
-    usdcMint: USDC_MINT,
-    treasuryUsdcAta: TREASURY_USDC_ATA,
+    treasury: TREASURY,
     x: params.x,
     y: params.y,
     width: params.width,
@@ -200,29 +197,12 @@ export async function executePurchase(
   sellerAddress: string,
   assetAddress: string
 ): Promise<string> {
-  const TOKEN_PROGRAM =
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address;
-  const ATA_PROGRAM =
-    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address;
-
-  // Derive seller's USDC ATA: PDA([seller, tokenProgram, usdcMint], ataProgram)
-  const [sellerUsdcAta] = await getProgramDerivedAddress({
-    programAddress: ATA_PROGRAM,
-    seeds: [
-      getAddressEncoder().encode(sellerAddress as Address),
-      getAddressEncoder().encode(TOKEN_PROGRAM),
-      getAddressEncoder().encode(USDC_MINT),
-    ],
-  });
-
   const ix = await getExecutePurchaseInstructionAsync({
     buyer: signer,
     seller: sellerAddress as Address,
     asset: assetAddress as Address,
     collection: COLLECTION_ADDRESS,
-    usdcMint: USDC_MINT,
-    sellerUsdcAta,
-    treasuryUsdcAta: TREASURY_USDC_ATA,
+    treasury: TREASURY,
   });
 
   return buildAndSend(signer, [ix]);
@@ -237,8 +217,7 @@ export async function buyBoost(
     payer: signer,
     asset: assetAddress as Address,
     collection: COLLECTION_ADDRESS,
-    usdcMint: USDC_MINT,
-    treasuryUsdcAta: TREASURY_USDC_ATA,
+    treasury: TREASURY,
     boostFlags,
   });
 

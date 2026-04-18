@@ -59,12 +59,7 @@ export type ExecutePurchaseInstruction<
   TAccountAsset extends string | AccountMeta<string> = string,
   TAccountCollection extends string | AccountMeta<string> = string,
   TAccountListing extends string | AccountMeta<string> = string,
-  TAccountUsdcMint extends string | AccountMeta<string> = string,
-  TAccountBuyerUsdcAta extends string | AccountMeta<string> = string,
-  TAccountSellerUsdcAta extends string | AccountMeta<string> = string,
-  TAccountTreasuryUsdcAta extends string | AccountMeta<string> = string,
-  TAccountTokenProgram extends string | AccountMeta<string> =
-    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountTreasury extends string | AccountMeta<string> = string,
   TAccountMplCoreProgram extends string | AccountMeta<string> =
     "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d",
   TAccountSystemProgram extends string | AccountMeta<string> =
@@ -93,21 +88,9 @@ export type ExecutePurchaseInstruction<
       TAccountListing extends string
         ? WritableAccount<TAccountListing>
         : TAccountListing,
-      TAccountUsdcMint extends string
-        ? ReadonlyAccount<TAccountUsdcMint>
-        : TAccountUsdcMint,
-      TAccountBuyerUsdcAta extends string
-        ? WritableAccount<TAccountBuyerUsdcAta>
-        : TAccountBuyerUsdcAta,
-      TAccountSellerUsdcAta extends string
-        ? WritableAccount<TAccountSellerUsdcAta>
-        : TAccountSellerUsdcAta,
-      TAccountTreasuryUsdcAta extends string
-        ? WritableAccount<TAccountTreasuryUsdcAta>
-        : TAccountTreasuryUsdcAta,
-      TAccountTokenProgram extends string
-        ? ReadonlyAccount<TAccountTokenProgram>
-        : TAccountTokenProgram,
+      TAccountTreasury extends string
+        ? WritableAccount<TAccountTreasury>
+        : TAccountTreasury,
       TAccountMplCoreProgram extends string
         ? ReadonlyAccount<TAccountMplCoreProgram>
         : TAccountMplCoreProgram,
@@ -154,11 +137,7 @@ export type ExecutePurchaseAsyncInput<
   TAccountAsset extends string = string,
   TAccountCollection extends string = string,
   TAccountListing extends string = string,
-  TAccountUsdcMint extends string = string,
-  TAccountBuyerUsdcAta extends string = string,
-  TAccountSellerUsdcAta extends string = string,
-  TAccountTreasuryUsdcAta extends string = string,
-  TAccountTokenProgram extends string = string,
+  TAccountTreasury extends string = string,
   TAccountMplCoreProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
@@ -171,11 +150,8 @@ export type ExecutePurchaseAsyncInput<
   /** The collection account */
   collection: Address<TAccountCollection>;
   listing?: Address<TAccountListing>;
-  usdcMint: Address<TAccountUsdcMint>;
-  buyerUsdcAta?: Address<TAccountBuyerUsdcAta>;
-  sellerUsdcAta: Address<TAccountSellerUsdcAta>;
-  treasuryUsdcAta: Address<TAccountTreasuryUsdcAta>;
-  tokenProgram?: Address<TAccountTokenProgram>;
+  /** SOL recipient for the marketplace fee. */
+  treasury: Address<TAccountTreasury>;
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
 };
@@ -187,11 +163,7 @@ export async function getExecutePurchaseInstructionAsync<
   TAccountAsset extends string,
   TAccountCollection extends string,
   TAccountListing extends string,
-  TAccountUsdcMint extends string,
-  TAccountBuyerUsdcAta extends string,
-  TAccountSellerUsdcAta extends string,
-  TAccountTreasuryUsdcAta extends string,
-  TAccountTokenProgram extends string,
+  TAccountTreasury extends string,
   TAccountMplCoreProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
@@ -203,11 +175,7 @@ export async function getExecutePurchaseInstructionAsync<
     TAccountAsset,
     TAccountCollection,
     TAccountListing,
-    TAccountUsdcMint,
-    TAccountBuyerUsdcAta,
-    TAccountSellerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >,
@@ -221,11 +189,7 @@ export async function getExecutePurchaseInstructionAsync<
     TAccountAsset,
     TAccountCollection,
     TAccountListing,
-    TAccountUsdcMint,
-    TAccountBuyerUsdcAta,
-    TAccountSellerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >
@@ -241,11 +205,7 @@ export async function getExecutePurchaseInstructionAsync<
     asset: { value: input.asset ?? null, isWritable: true },
     collection: { value: input.collection ?? null, isWritable: true },
     listing: { value: input.listing ?? null, isWritable: true },
-    usdcMint: { value: input.usdcMint ?? null, isWritable: false },
-    buyerUsdcAta: { value: input.buyerUsdcAta ?? null, isWritable: true },
-    sellerUsdcAta: { value: input.sellerUsdcAta ?? null, isWritable: true },
-    treasuryUsdcAta: { value: input.treasuryUsdcAta ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     mplCoreProgram: { value: input.mplCoreProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -279,37 +239,6 @@ export async function getExecutePurchaseInstructionAsync<
       ],
     });
   }
-  if (!accounts.buyerUsdcAta.value) {
-    accounts.buyerUsdcAta.value = await getProgramDerivedAddress({
-      programAddress:
-        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">,
-      seeds: [
-        getAddressEncoder().encode(
-          getAddressFromResolvedInstructionAccount(
-            "buyer",
-            accounts.buyer.value,
-          ),
-        ),
-        getBytesEncoder().encode(
-          new Uint8Array([
-            6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-            121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133,
-            126, 255, 0, 169,
-          ]),
-        ),
-        getAddressEncoder().encode(
-          getAddressFromResolvedInstructionAccount(
-            "usdcMint",
-            accounts.usdcMint.value,
-          ),
-        ),
-      ],
-    });
-  }
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
-  }
   if (!accounts.mplCoreProgram.value) {
     accounts.mplCoreProgram.value =
       "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d" as Address<"CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d">;
@@ -328,11 +257,7 @@ export async function getExecutePurchaseInstructionAsync<
       getAccountMeta("asset", accounts.asset),
       getAccountMeta("collection", accounts.collection),
       getAccountMeta("listing", accounts.listing),
-      getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("buyerUsdcAta", accounts.buyerUsdcAta),
-      getAccountMeta("sellerUsdcAta", accounts.sellerUsdcAta),
-      getAccountMeta("treasuryUsdcAta", accounts.treasuryUsdcAta),
-      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("treasury", accounts.treasury),
       getAccountMeta("mplCoreProgram", accounts.mplCoreProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
@@ -346,11 +271,7 @@ export async function getExecutePurchaseInstructionAsync<
     TAccountAsset,
     TAccountCollection,
     TAccountListing,
-    TAccountUsdcMint,
-    TAccountBuyerUsdcAta,
-    TAccountSellerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >);
@@ -363,11 +284,7 @@ export type ExecutePurchaseInput<
   TAccountAsset extends string = string,
   TAccountCollection extends string = string,
   TAccountListing extends string = string,
-  TAccountUsdcMint extends string = string,
-  TAccountBuyerUsdcAta extends string = string,
-  TAccountSellerUsdcAta extends string = string,
-  TAccountTreasuryUsdcAta extends string = string,
-  TAccountTokenProgram extends string = string,
+  TAccountTreasury extends string = string,
   TAccountMplCoreProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
@@ -380,11 +297,8 @@ export type ExecutePurchaseInput<
   /** The collection account */
   collection: Address<TAccountCollection>;
   listing: Address<TAccountListing>;
-  usdcMint: Address<TAccountUsdcMint>;
-  buyerUsdcAta: Address<TAccountBuyerUsdcAta>;
-  sellerUsdcAta: Address<TAccountSellerUsdcAta>;
-  treasuryUsdcAta: Address<TAccountTreasuryUsdcAta>;
-  tokenProgram?: Address<TAccountTokenProgram>;
+  /** SOL recipient for the marketplace fee. */
+  treasury: Address<TAccountTreasury>;
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
 };
@@ -396,11 +310,7 @@ export function getExecutePurchaseInstruction<
   TAccountAsset extends string,
   TAccountCollection extends string,
   TAccountListing extends string,
-  TAccountUsdcMint extends string,
-  TAccountBuyerUsdcAta extends string,
-  TAccountSellerUsdcAta extends string,
-  TAccountTreasuryUsdcAta extends string,
-  TAccountTokenProgram extends string,
+  TAccountTreasury extends string,
   TAccountMplCoreProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
@@ -412,11 +322,7 @@ export function getExecutePurchaseInstruction<
     TAccountAsset,
     TAccountCollection,
     TAccountListing,
-    TAccountUsdcMint,
-    TAccountBuyerUsdcAta,
-    TAccountSellerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >,
@@ -429,11 +335,7 @@ export function getExecutePurchaseInstruction<
   TAccountAsset,
   TAccountCollection,
   TAccountListing,
-  TAccountUsdcMint,
-  TAccountBuyerUsdcAta,
-  TAccountSellerUsdcAta,
-  TAccountTreasuryUsdcAta,
-  TAccountTokenProgram,
+  TAccountTreasury,
   TAccountMplCoreProgram,
   TAccountSystemProgram
 > {
@@ -448,11 +350,7 @@ export function getExecutePurchaseInstruction<
     asset: { value: input.asset ?? null, isWritable: true },
     collection: { value: input.collection ?? null, isWritable: true },
     listing: { value: input.listing ?? null, isWritable: true },
-    usdcMint: { value: input.usdcMint ?? null, isWritable: false },
-    buyerUsdcAta: { value: input.buyerUsdcAta ?? null, isWritable: true },
-    sellerUsdcAta: { value: input.sellerUsdcAta ?? null, isWritable: true },
-    treasuryUsdcAta: { value: input.treasuryUsdcAta ?? null, isWritable: true },
-    tokenProgram: { value: input.tokenProgram ?? null, isWritable: false },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     mplCoreProgram: { value: input.mplCoreProgram ?? null, isWritable: false },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -462,10 +360,6 @@ export function getExecutePurchaseInstruction<
   >;
 
   // Resolve default values.
-  if (!accounts.tokenProgram.value) {
-    accounts.tokenProgram.value =
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
-  }
   if (!accounts.mplCoreProgram.value) {
     accounts.mplCoreProgram.value =
       "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d" as Address<"CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d">;
@@ -484,11 +378,7 @@ export function getExecutePurchaseInstruction<
       getAccountMeta("asset", accounts.asset),
       getAccountMeta("collection", accounts.collection),
       getAccountMeta("listing", accounts.listing),
-      getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("buyerUsdcAta", accounts.buyerUsdcAta),
-      getAccountMeta("sellerUsdcAta", accounts.sellerUsdcAta),
-      getAccountMeta("treasuryUsdcAta", accounts.treasuryUsdcAta),
-      getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("treasury", accounts.treasury),
       getAccountMeta("mplCoreProgram", accounts.mplCoreProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
@@ -502,11 +392,7 @@ export function getExecutePurchaseInstruction<
     TAccountAsset,
     TAccountCollection,
     TAccountListing,
-    TAccountUsdcMint,
-    TAccountBuyerUsdcAta,
-    TAccountSellerUsdcAta,
-    TAccountTreasuryUsdcAta,
-    TAccountTokenProgram,
+    TAccountTreasury,
     TAccountMplCoreProgram,
     TAccountSystemProgram
   >);
@@ -527,13 +413,10 @@ export type ParsedExecutePurchaseInstruction<
     /** The collection account */
     collection: TAccountMetas[4];
     listing: TAccountMetas[5];
-    usdcMint: TAccountMetas[6];
-    buyerUsdcAta: TAccountMetas[7];
-    sellerUsdcAta: TAccountMetas[8];
-    treasuryUsdcAta: TAccountMetas[9];
-    tokenProgram: TAccountMetas[10];
-    mplCoreProgram: TAccountMetas[11];
-    systemProgram: TAccountMetas[12];
+    /** SOL recipient for the marketplace fee. */
+    treasury: TAccountMetas[6];
+    mplCoreProgram: TAccountMetas[7];
+    systemProgram: TAccountMetas[8];
   };
   data: ExecutePurchaseInstructionData;
 };
@@ -546,12 +429,12 @@ export function parseExecutePurchaseInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedExecutePurchaseInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 13) {
+  if (instruction.accounts.length < 9) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 13,
+        expectedAccountMetas: 9,
       },
     );
   }
@@ -570,11 +453,7 @@ export function parseExecutePurchaseInstruction<
       asset: getNextAccount(),
       collection: getNextAccount(),
       listing: getNextAccount(),
-      usdcMint: getNextAccount(),
-      buyerUsdcAta: getNextAccount(),
-      sellerUsdcAta: getNextAccount(),
-      treasuryUsdcAta: getNextAccount(),
-      tokenProgram: getNextAccount(),
+      treasury: getNextAccount(),
       mplCoreProgram: getNextAccount(),
       systemProgram: getNextAccount(),
     },

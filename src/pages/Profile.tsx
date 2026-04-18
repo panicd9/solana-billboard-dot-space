@@ -9,7 +9,7 @@ import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
 import RegionMiniMap from "@/components/RegionMiniMap";
 import { useRegions } from "@/context/RegionContext";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import logo from "@/assets/logo.png";
 import type { Region } from "@/types/region";
 
@@ -232,7 +232,7 @@ interface RegionCardProps {
 const RegionCard = ({ region: r, onOpen }: RegionCardProps) => {
   const currentPrice =
     r.isListed && r.listing
-      ? formatUsdc(
+      ? formatSol(
           calculateListingCurrentPrice(
             r.listing.startPrice,
             r.listing.endPrice,
@@ -287,7 +287,7 @@ const RegionCard = ({ region: r, onOpen }: RegionCardProps) => {
           <span className={r.isListed ? "text-accent inline-flex items-center gap-1" : "text-muted-foreground"}>
             {currentPrice ? (
               <>
-                <Tag className="w-3 h-3" /> {currentPrice} USDC
+                <Tag className="w-3 h-3" /> {currentPrice} SOL
               </>
             ) : (
               "Unlisted"

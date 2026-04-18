@@ -6,10 +6,8 @@ use crate::constants::*;
 pub struct CanvasState {
     /// The admin authority that initialized the canvas
     pub authority: Pubkey,
-    /// Treasury wallet that receives USDC payments
+    /// Treasury wallet that receives SOL payments (mint, boost, marketplace fee)
     pub treasury: Pubkey,
-    /// USDC mint address
-    pub usdc_mint: Pubkey,
     /// Metaplex Core Collection address
     pub collection: Pubkey,
     /// Total regions minted
@@ -27,9 +25,9 @@ pub struct CanvasState {
 }
 
 impl CanvasState {
-    // 32 (authority) + 32 (treasury) + 32 (usdc_mint) + 32 (collection)
-    // + 4 (total_minted) + 4 (curve_blocks_sold) + 1 (bump) + 3 (padding) + 2592 (bitmap) = 2732
-    pub const INIT_SPACE: usize = 32 + 32 + 32 + 32 + 4 + 4 + 1 + 3 + BITMAP_SIZE;
+    // 32 (authority) + 32 (treasury) + 32 (collection)
+    // + 4 (total_minted) + 4 (curve_blocks_sold) + 1 (bump) + 3 (padding) + 2592 (bitmap) = 2700
+    pub const INIT_SPACE: usize = 32 + 32 + 32 + 4 + 4 + 1 + 3 + BITMAP_SIZE;
 
     /// Check if a specific block at (x, y) is occupied
     pub fn is_occupied(&self, x: u16, y: u16) -> bool {

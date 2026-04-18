@@ -55,9 +55,9 @@ export type Listing = {
   seller: Address;
   /** The Metaplex Core asset being sold */
   asset: Address;
-  /** Starting price in USDC lamports (6 decimals) */
+  /** Starting price in SOL lamports */
   startPrice: bigint;
-  /** Ending price in USDC lamports (6 decimals) */
+  /** Ending price in SOL lamports */
   endPrice: bigint;
   /** Unix timestamp when the price curve starts */
   startTime: bigint;
@@ -72,9 +72,9 @@ export type ListingArgs = {
   seller: Address;
   /** The Metaplex Core asset being sold */
   asset: Address;
-  /** Starting price in USDC lamports (6 decimals) */
+  /** Starting price in SOL lamports */
   startPrice: number | bigint;
-  /** Ending price in USDC lamports (6 decimals) */
+  /** Ending price in SOL lamports */
   endPrice: number | bigint;
   /** Unix timestamp when the price curve starts */
   startTime: number | bigint;

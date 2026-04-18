@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_lang::system_program::{self, Transfer};
 use mpl_core::instructions::TransferV1CpiBuilder;
 use crate::constants::*;
 use crate::error::ErrorCode;
@@ -10,7 +10,7 @@ pub struct ExecutePurchase<'info> {
     #[account(mut)]
     pub buyer: Signer<'info>,
 
-    /// CHECK: The original seller, receives USDC and rent from closed listing.
+    /// CHECK: The original seller, receives SOL proceeds and rent from the closed listing.
     /// Validated via has_one on listing.
     #[account(mut)]
     pub seller: AccountInfo<'info>,
@@ -41,30 +41,10 @@ pub struct ExecutePurchase<'info> {
     )]
     pub listing: Account<'info, Listing>,
 
-    // --- USDC payment accounts ---
-    pub usdc_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        mut,
-        associated_token::mint = usdc_mint,
-        associated_token::authority = buyer,
-    )]
-    pub buyer_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        token::mint = usdc_mint,
-        token::authority = seller,
-    )]
-    pub seller_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        token::mint = usdc_mint,
-    )]
-    pub treasury_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    pub token_program: Interface<'info, TokenInterface>,
+    /// SOL recipient for the marketplace fee.
+    /// CHECK: Validated in handler against canvas_state.treasury.
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
 
     /// CHECK: Metaplex Core program
     #[account(address = mpl_core::ID)]
@@ -76,7 +56,7 @@ pub struct ExecutePurchase<'info> {
 pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
     let listing = &ctx.accounts.listing;
 
-    // 1. Validate collection and USDC mint
+    // 1. Validate collection + treasury
     {
         let canvas_state = ctx.accounts.canvas_state.load()?;
         require!(
@@ -84,11 +64,7 @@ pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
             ErrorCode::InvalidCollection
         );
         require!(
-            ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
-            ErrorCode::InvalidUsdcMint
-        );
-        require!(
-            ctx.accounts.treasury_usdc_ata.owner == canvas_state.treasury,
+            ctx.accounts.treasury.key() == canvas_state.treasury,
             ErrorCode::InvalidTreasury
         );
     }
@@ -97,7 +73,7 @@ pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
     let clock = Clock::get()?;
     let price = listing.current_price(clock.unix_timestamp)?;
 
-    // 3. Calculate fee (2.5%) and seller proceeds
+    // 3. Calculate marketplace fee and seller proceeds
     let fee = (price as u128)
         .checked_mul(MARKETPLACE_FEE_BPS as u128)
         .ok_or(error!(ErrorCode::ArithmeticOverflow))?
@@ -105,30 +81,28 @@ pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
     let fee = fee as u64;
     let seller_amount = price.checked_sub(fee).ok_or(error!(ErrorCode::ArithmeticOverflow))?;
 
-    // 4. Transfer USDC from buyer to seller
+    // 4. Transfer SOL from buyer to seller
     if seller_amount > 0 {
-        let transfer_to_seller = TransferChecked {
-            from: ctx.accounts.buyer_usdc_ata.to_account_info(),
-            mint: ctx.accounts.usdc_mint.to_account_info(),
-            to: ctx.accounts.seller_usdc_ata.to_account_info(),
-            authority: ctx.accounts.buyer.to_account_info(),
-        };
-        let cpi_ctx =
-            CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_to_seller);
-        token_interface::transfer_checked(cpi_ctx, seller_amount, USDC_DECIMALS)?;
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.buyer.to_account_info(),
+                to: ctx.accounts.seller.to_account_info(),
+            },
+        );
+        system_program::transfer(cpi_ctx, seller_amount)?;
     }
 
-    // 5. Transfer USDC fee from buyer to treasury
+    // 5. Transfer SOL fee from buyer to treasury
     if fee > 0 {
-        let transfer_to_treasury = TransferChecked {
-            from: ctx.accounts.buyer_usdc_ata.to_account_info(),
-            mint: ctx.accounts.usdc_mint.to_account_info(),
-            to: ctx.accounts.treasury_usdc_ata.to_account_info(),
-            authority: ctx.accounts.buyer.to_account_info(),
-        };
-        let cpi_ctx =
-            CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_to_treasury);
-        token_interface::transfer_checked(cpi_ctx, fee, USDC_DECIMALS)?;
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.buyer.to_account_info(),
+                to: ctx.accounts.treasury.to_account_info(),
+            },
+        );
+        system_program::transfer(cpi_ctx, fee)?;
     }
 
     // 6. Transfer NFT from listing PDA (current owner) to buyer

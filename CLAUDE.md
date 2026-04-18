@@ -26,7 +26,7 @@ npm run test:watch   # Watch mode (vitest)
 
 ### On-chain Integration
 
-This app talks to a deployed Anchor/Solana program (program ID in [src/config/env.ts](src/config/env.ts), default `DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2`). Network, RPC/WS URLs, USDC mint, collection address, treasury ATA, and Pinata credentials are all `VITE_*` env vars with devnet defaults.
+This app talks to a deployed Anchor/Solana program (program ID in [src/config/env.ts](src/config/env.ts), default `DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2`). Network, RPC/WS URLs, collection address, treasury wallet, and Pinata credentials are all `VITE_*` env vars with devnet defaults. **All payments are in native SOL — no SPL token flows.**
 
 - [src/solana/constants.ts](src/solana/constants.ts) — program addresses, grid dims, pricing constants, boost flags (must match Rust `constants.rs`).
 - [src/solana/pricing.ts](src/solana/pricing.ts) — `calculateRegionPrice` mirrors the on-chain pricing function; `calculateListingCurrentPrice` computes the current Dutch-auction price.
@@ -47,11 +47,11 @@ All region state is read from on-chain accounts via TanStack Query and exposed t
 ### Grid & Pricing ([src/solana/constants.ts](src/solana/constants.ts), [src/types/region.ts](src/types/region.ts))
 
 - 192×108 grid of 10px blocks = 1920×1080 canvas (20,736 blocks total).
-- **Center zone**: 60×34 block region centered at (66, 37). Flat price **0.12 USDC/block**.
-- **Curve zone**: remaining 18,696 blocks follow a linear bonding curve from **0.01 → 0.10 USDC/block** as `curveBlocksSold` increases.
-- Prices are in USDC lamports (6 decimals). Use `formatUsdc()` for display. **Never assume SOL or flat pricing.**
-- **Boosts**: HIGHLIGHTED (1 USDC), GLOWING (2 USDC), TRENDING (5 USDC) — bitflags on the region account.
-- **Marketplace fee**: 4% (400 bps).
+- **Center zone**: 60×34 block region centered at (66, 37). Flat price **0.0004 SOL/block** (0.816 SOL for the full zone).
+- **Curve zone**: remaining 18,696 blocks follow a linear bonding curve from **0.00004 → 0.0004 SOL/block** as `curveBlocksSold` increases (~4.11 SOL fully saturated).
+- Full billboard saturates at ~4.93 SOL. Prices are in SOL lamports (9 decimals). Use `formatSol()` for display.
+- **Boosts**: HIGHLIGHTED, GLOWING, TRENDING — flat **0.015 SOL** each, bitflags on the region account.
+- **Marketplace fee**: 4% (400 bps), paid in SOL to the treasury wallet.
 
 ### Routes ([src/App.tsx](src/App.tsx))
 
@@ -89,4 +89,4 @@ UI primitives in [src/components/ui/](src/components/ui/) are shadcn/ui — do n
 - Fonts: Space Grotesk (headings), JetBrains Mono (code).
 - `global: "globalThis"` is defined in [vite.config.ts](vite.config.ts) for Buffer polyfill compatibility.
 - Grid dimensions and pricing constants must stay in sync with the Rust program's `constants.rs`.
-- Treat lamport amounts as `bigint` end-to-end; only convert to `number` at the display boundary via `formatUsdc`.
+- Treat lamport amounts as `bigint` end-to-end; only convert to `number` at the display boundary via `formatSol`.

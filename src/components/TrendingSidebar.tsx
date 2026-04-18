@@ -1,6 +1,6 @@
 import { useRegions } from "@/context/RegionContext";
 import { TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
-import { calculateListingCurrentPrice, formatUsdc } from "@/solana/pricing";
+import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import type { Region } from "@/types/region";
 
 interface Props {
@@ -69,7 +69,7 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
                   </p>
                   {r.isListed && r.listing && (
                     <p className="text-xs text-accent font-semibold">
-                      {formatUsdc(
+                      {formatSol(
                         calculateListingCurrentPrice(
                           r.listing.startPrice,
                           r.listing.endPrice,
@@ -77,7 +77,7 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
                           r.listing.endTime
                         )
                       )}{" "}
-                      USDC
+                      SOL
                     </p>
                   )}
                 </div>

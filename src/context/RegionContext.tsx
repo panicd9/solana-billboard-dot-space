@@ -20,7 +20,7 @@ import {
   useExecutePurchase,
   useBuyBoost,
 } from "@/hooks/useProgramTransactions";
-import { calculateRegionPrice, formatUsdc } from "@/solana/pricing";
+import { calculateRegionPrice, formatSol } from "@/solana/pricing";
 import { ipfsToGateway } from "@/solana/accounts";
 
 interface RegionContextType {
@@ -207,7 +207,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         sel.height,
         curveBlocksSold
       );
-      return { lamports, display: formatUsdc(lamports) };
+      return { lamports, display: formatSol(lamports) };
     },
     [canvasState.data?.curveBlocksSold]
   );

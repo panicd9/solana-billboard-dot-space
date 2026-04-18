@@ -314,7 +314,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.strokeRect(czX, czY, czW, czH);
         ctx.setLineDash([]);
 
-        const label = "Center Zone — 0.12 USDC/block";
+        const label = "Center Zone — 0.0004 SOL/block";
         const fontSize = 18 / zoom;
         ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
         const tm = ctx.measureText(label);
@@ -325,7 +325,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.fillStyle = "rgba(255, 200, 55, 0.95)";
         ctx.fillText(label, lx, ly);
 
-        const outerLabel = "Outer Zone — bonding curve 0.01–0.10 USDC";
+        const outerLabel = "Outer Zone — bonding curve 0.00004–0.0004 SOL";
         const outerFontSize = 16 / zoom;
         ctx.font = `bold ${outerFontSize}px 'Space Grotesk', sans-serif`;
         const otm = ctx.measureText(outerLabel);
@@ -660,7 +660,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
             </p>
             <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-mono text-accent bg-accent/10 px-2.5 py-1 rounded-full">
               <Coins className="w-3 h-3" aria-hidden="true" />
-              From 0.01 USDC per block
+              From 0.00004 SOL per block
             </div>
           </div>
         </div>

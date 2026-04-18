@@ -1,9 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { expect } from "chai";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Keypair, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
-  BOOST_PRICE_HIGHLIGHTED,
+  BOOST_PRICE,
   BPS_DENOM,
   CENTER_PRICE_PER_BLOCK,
   CURVE_START_PRICE,
@@ -16,25 +15,21 @@ import {
   bootstrap,
   boostsPda,
   buyBoost,
-  canvasPda,
   cancelListing,
-  createAta,
   createListing,
-  createUsdcMint,
   executePurchase,
   extractErrorName,
-  fundUsdc,
+  lamportBalance,
   listingPda,
   mintRegion,
   readAssetOwner,
-  usdc,
-  usdcBalance,
+  sol,
 } from "./helpers";
 
 describe("solana-space", () => {
   let ctx: TestContext;
 
-  before("bootstrap canvas + usdc + collection", async () => {
+  before("bootstrap canvas + collection", async () => {
     ctx = await bootstrap();
   });
 
@@ -46,7 +41,6 @@ describe("solana-space", () => {
       const state = await ctx.program.account.canvasState.fetch(ctx.canvas);
       expect(state.authority.toBase58()).to.equal(ctx.authority.publicKey.toBase58());
       expect(state.treasury.toBase58()).to.equal(ctx.treasury.publicKey.toBase58());
-      expect(state.usdcMint.toBase58()).to.equal(ctx.usdcMint.toBase58());
       expect(state.collection.toBase58()).to.equal(ctx.collection.publicKey.toBase58());
       expect(state.totalMinted).to.equal(0);
       expect(state.curveBlocksSold).to.equal(0);
@@ -58,7 +52,6 @@ describe("solana-space", () => {
         await ctx.program.methods
           .initialize({
             treasury: ctx.treasury.publicKey,
-            usdcMint: ctx.usdcMint,
             collectionUri: "https://x.com/c.json",
           })
           .accounts({
@@ -83,11 +76,11 @@ describe("solana-space", () => {
   // mint_region
   // ========================================================================
   describe("mint_region", () => {
-    it("mints a 1x1 bonding-curve region and charges USDC", async () => {
-      const before = await usdcBalance(ctx.provider, ctx.treasuryAta);
-      const { asset, payerAta } = await mintRegion(ctx, { x: 0, y: 0, width: 1, height: 1 });
+    it("mints a 1x1 bonding-curve region and charges SOL", async () => {
+      const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
+      const { asset } = await mintRegion(ctx, { x: 0, y: 0, width: 1, height: 1 });
       const [after, assetInfo, state] = await Promise.all([
-        usdcBalance(ctx.provider, ctx.treasuryAta),
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
         ctx.provider.connection.getAccountInfo(asset.publicKey),
         ctx.program.account.canvasState.fetch(ctx.canvas),
       ]);
@@ -97,14 +90,13 @@ describe("solana-space", () => {
       expect(assetInfo!.owner.toBase58()).to.equal(MPL_CORE_ID.toBase58());
       expect(state.totalMinted).to.be.greaterThan(0);
       expect(state.curveBlocksSold).to.be.greaterThan(0);
-      expect(payerAta).to.not.equal(null);
     });
 
     it("mints a 2x2 region in the center zone at fixed price", async () => {
       // CENTER_ZONE origin is (66, 37).
-      const before = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       await mintRegion(ctx, { x: 66, y: 37, width: 2, height: 2 });
-      const after = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const after = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       expect(after - before).to.equal(4n * CENTER_PRICE_PER_BLOCK);
     });
 
@@ -170,11 +162,11 @@ describe("solana-space", () => {
     });
 
     it("bonding curve: second curve mint costs more than first", async () => {
-      const t0 = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const t0 = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       await mintRegion(ctx, { x: 2, y: 0, width: 1, height: 1 });
-      const t1 = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const t1 = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       await mintRegion(ctx, { x: 3, y: 0, width: 1, height: 1 });
-      const t2 = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const t2 = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
 
       const firstCost = t1 - t0;
       const secondCost = t2 - t1;
@@ -184,62 +176,18 @@ describe("solana-space", () => {
     it("mixed region straddling center + curve zone", async () => {
       // 2x1 region where x=65 is curve, x=66 is first center column.
       // Use y=40 to avoid the 2x2 center region already minted at (66, 37).
-      const before = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       await mintRegion(ctx, { x: 65, y: 40, width: 2, height: 1 });
-      const after = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const after = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       const paid = after - before;
-      // 1 center block = 120_000. 1 curve block ≥ 10_000. So paid > 120_000 and < 1 USDC.
-      expect(paid > 120_000n).to.equal(true);
-      expect(paid < 1_000_000n).to.equal(true);
+      // 1 center block = 400_000 lamports; 1 curve block ≥ 40_000 lamports.
+      expect(paid > CENTER_PRICE_PER_BLOCK).to.equal(true);
+      expect(paid < 2n * CENTER_PRICE_PER_BLOCK).to.equal(true);
     });
 
-    it("rejects unknown USDC mint", async () => {
-      const bogusMintAuth = Keypair.generate();
-      const bogusMint = await createUsdcMint(ctx.provider, bogusMintAuth);
-      const buyer = Keypair.generate();
-      await airdrop(ctx.provider.connection, buyer.publicKey);
-      const payerAta = await fundUsdc(
-        ctx.provider,
-        bogusMint,
-        bogusMintAuth,
-        buyer.publicKey,
-        usdc(100)
-      );
-      const treasuryAta = await createAta(ctx.provider, bogusMint, ctx.treasury.publicKey);
-      const asset = Keypair.generate();
-
-      try {
-        await ctx.program.methods
-          .mintRegion({ x: 20, y: 0, width: 1, height: 1, imageUri: "a", link: "b" })
-          .accounts({
-            payer: buyer.publicKey,
-            asset: asset.publicKey,
-            collection: ctx.collection.publicKey,
-            usdcMint: bogusMint,
-            payerUsdcAta: payerAta,
-            treasuryUsdcAta: treasuryAta,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            mplCoreProgram: MPL_CORE_ID,
-            systemProgram: SystemProgram.programId,
-          } as any)
-          .signers([buyer, asset])
-          .rpc();
-        expect.fail("should have failed");
-      } catch (e) {
-        expect(extractErrorName(e)).to.equal("InvalidUsdcMint");
-      }
-    });
-
-    it("BLOCKS free-mint exploit: attacker-controlled treasury ATA", async () => {
+    it("BLOCKS free-mint exploit: attacker-controlled treasury", async () => {
       const attacker = Keypair.generate();
       await airdrop(ctx.provider.connection, attacker.publicKey);
-      const attackerAta = await fundUsdc(
-        ctx.provider,
-        ctx.usdcMint,
-        ctx.usdcMintAuthority,
-        attacker.publicKey,
-        usdc(100)
-      );
       const asset = Keypair.generate();
 
       try {
@@ -249,11 +197,8 @@ describe("solana-space", () => {
             payer: attacker.publicKey,
             asset: asset.publicKey,
             collection: ctx.collection.publicKey,
-            usdcMint: ctx.usdcMint,
-            payerUsdcAta: attackerAta,
-            // Attacker passes their own ATA as the treasury destination.
-            treasuryUsdcAta: attackerAta,
-            tokenProgram: TOKEN_PROGRAM_ID,
+            // Attacker passes their own wallet as the treasury destination.
+            treasury: attacker.publicKey,
             mplCoreProgram: MPL_CORE_ID,
             systemProgram: SystemProgram.programId,
           } as any)
@@ -396,28 +341,21 @@ describe("solana-space", () => {
     let asset: Keypair;
     let boosts: PublicKey;
 
-    before("mint region + fund owner for boosts", async () => {
+    before("mint region for boost tests", async () => {
       const res = await mintRegion(ctx, { x: 70, y: 0, width: 1, height: 1 });
       owner = res.buyer;
       asset = res.asset;
       boosts = boostsPda(ctx.program.programId, asset.publicKey);
-      await fundUsdc(
-        ctx.provider,
-        ctx.usdcMint,
-        ctx.usdcMintAuthority,
-        owner.publicKey,
-        usdc(20)
-      );
     });
 
-    it("buys Highlighted boost (1 USDC)", async () => {
-      const before = await usdcBalance(ctx.provider, ctx.treasuryAta);
+    it("buys Highlighted boost", async () => {
+      const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       await buyBoost(ctx, { payer: owner, asset: asset.publicKey, flags: 1 });
       const [after, state] = await Promise.all([
-        usdcBalance(ctx.provider, ctx.treasuryAta),
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
         ctx.program.account.boosts.fetch(boosts),
       ]);
-      expect(after - before).to.equal(BOOST_PRICE_HIGHLIGHTED);
+      expect(after - before).to.equal(BOOST_PRICE);
       expect(state.flags).to.equal(1);
     });
 
@@ -448,20 +386,19 @@ describe("solana-space", () => {
       }
     });
 
-    it("buys all three boosts at once (flags = 7, 8 USDC)", async () => {
+    it("buys all three boosts at once (flags = 7)", async () => {
       const { asset: a2, buyer: b2 } = await mintRegion(ctx, {
         x: 72, y: 0, width: 1, height: 1,
       });
-      await fundUsdc(ctx.provider, ctx.usdcMint, ctx.usdcMintAuthority, b2.publicKey, usdc(20));
 
-      const before = await usdcBalance(ctx.provider, ctx.treasuryAta);
+      const before = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       await buyBoost(ctx, { payer: b2, asset: a2.publicKey, flags: 7 });
       const [after, state] = await Promise.all([
-        usdcBalance(ctx.provider, ctx.treasuryAta),
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
         ctx.program.account.boosts.fetch(boostsPda(ctx.program.programId, a2.publicKey)),
       ]);
-      // 1 + 2 + 5 = 8 USDC
-      expect(after - before).to.equal(8_000_000n);
+      // 3 × 15_000_000 = 45_000_000 lamports
+      expect(after - before).to.equal(45_000_000n);
       expect(state.flags).to.equal(7);
     });
 
@@ -479,19 +416,16 @@ describe("solana-space", () => {
       }
     });
 
-    it("BLOCKS free-boost exploit: attacker-controlled treasury ATA", async () => {
+    it("BLOCKS free-boost exploit: attacker-controlled treasury", async () => {
       // Fresh region so boosts PDA is uninitialized.
       const { asset: a2, buyer: b2 } = await mintRegion(ctx, { x: 80, y: 0, width: 1, height: 1 });
-      await fundUsdc(ctx.provider, ctx.usdcMint, ctx.usdcMintAuthority, b2.publicKey, usdc(10));
-      const attackerAta = await createAta(ctx.provider, ctx.usdcMint, b2.publicKey);
 
       try {
         await buyBoost(ctx, {
           payer: b2,
           asset: a2.publicKey,
           flags: 1,
-          payerUsdcAta: attackerAta,
-          treasuryUsdcAta: attackerAta,
+          treasury: b2.publicKey,
         });
         expect.fail("exploit should have been blocked");
       } catch (e) {
@@ -511,8 +445,8 @@ describe("solana-space", () => {
       const listing = listingPda(ctx.program.programId, asset.publicKey);
 
       await createListing(ctx, seller, asset.publicKey, {
-        startPrice: 1_000_000,
-        endPrice: 500_000,
+        startPrice: sol(0.1),
+        endPrice: sol(0.05),
         durationSeconds: 3600,
       });
 
@@ -560,7 +494,7 @@ describe("solana-space", () => {
       try {
         await createListing(
           ctx, seller, asset.publicKey,
-          { startPrice: 1_000_000, endPrice: 1_000_000, durationSeconds: 3600 },
+          { startPrice: sol(0.1), endPrice: sol(0.1), durationSeconds: 3600 },
           { collection: Keypair.generate().publicKey }
         );
         expect.fail("should have failed");
@@ -573,7 +507,7 @@ describe("solana-space", () => {
       const { asset, buyer: seller } = await mintRegion(ctx, {
         x: 118, y: 0, width: 1, height: 1,
       });
-      const args = { startPrice: 1_000_000, endPrice: 1_000_000, durationSeconds: 3600 };
+      const args = { startPrice: sol(0.1), endPrice: sol(0.1), durationSeconds: 3600 };
       await createListing(ctx, seller, asset.publicKey, args);
       try {
         await createListing(ctx, seller, asset.publicKey, args);
@@ -590,7 +524,7 @@ describe("solana-space", () => {
       const { asset, buyer: seller } = await mintRegion(ctx, {
         x: 119, y: 0, width: 1, height: 1,
       });
-      const args = { startPrice: 1_000_000, endPrice: 1_000_000, durationSeconds: 3600 };
+      const args = { startPrice: sol(0.1), endPrice: sol(0.1), durationSeconds: 3600 };
       await createListing(ctx, seller, asset.publicKey, args);
       await cancelListing(ctx, seller, asset.publicKey);
       await createListing(ctx, seller, asset.publicKey, args);
@@ -620,7 +554,7 @@ describe("solana-space", () => {
         x: 130, y: 0, width: 1, height: 1,
       });
       await createListing(ctx, seller, asset.publicKey, {
-        startPrice: 1_000_000, endPrice: 1_000_000, durationSeconds: 3600,
+        startPrice: sol(0.1), endPrice: sol(0.1), durationSeconds: 3600,
       });
 
       const stranger = Keypair.generate();
@@ -642,7 +576,7 @@ describe("solana-space", () => {
       const { asset, buyer: seller } = await mintRegion(ctx, {
         x: 140, y: 0, width: 1, height: 1,
       });
-      const price = 10_000_000n;
+      const price = sol(1);
       const fee = (price * FEE_BPS) / BPS_DENOM;
       const sellerAmount = price - fee;
 
@@ -651,127 +585,52 @@ describe("solana-space", () => {
       });
 
       const buyer = Keypair.generate();
-      await airdrop(ctx.provider.connection, buyer.publicKey);
-      const [buyerAta, sellerAta] = await Promise.all([
-        fundUsdc(ctx.provider, ctx.usdcMint, ctx.usdcMintAuthority, buyer.publicKey, price),
-        createAta(ctx.provider, ctx.usdcMint, seller.publicKey),
-      ]);
+      await airdrop(ctx.provider.connection, buyer.publicKey, 5 * LAMPORTS_PER_SOL);
 
       const [treasuryBefore, sellerBefore] = await Promise.all([
-        usdcBalance(ctx.provider, ctx.treasuryAta),
-        usdcBalance(ctx.provider, sellerAta),
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
+        lamportBalance(ctx.provider.connection, seller.publicKey),
       ]);
 
       await executePurchase(ctx, {
-        buyer, seller: seller.publicKey, asset: asset.publicKey, buyerUsdcAta: buyerAta, sellerUsdcAta: sellerAta,
+        buyer, seller: seller.publicKey, asset: asset.publicKey,
       });
 
       const listing = listingPda(ctx.program.programId, asset.publicKey);
-      const [treasuryAfter, sellerAfter, buyerAfter, nftOwner, closed] = await Promise.all([
-        usdcBalance(ctx.provider, ctx.treasuryAta),
-        usdcBalance(ctx.provider, sellerAta),
-        usdcBalance(ctx.provider, buyerAta),
+      const [treasuryAfter, sellerAfter, nftOwner, closed] = await Promise.all([
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
+        lamportBalance(ctx.provider.connection, seller.publicKey),
         readAssetOwner(ctx.provider, asset.publicKey),
         ctx.program.account.listing.fetchNullable(listing),
       ]);
       expect(treasuryAfter - treasuryBefore).to.equal(fee);
-      expect(sellerAfter - sellerBefore).to.equal(sellerAmount);
-      expect(buyerAfter).to.equal(0n);
+      // Seller receives sellerAmount + rent refund from closed listing PDA.
+      expect(sellerAfter - sellerBefore >= sellerAmount).to.equal(true);
       expect(nftOwner.toBase58()).to.equal(buyer.publicKey.toBase58());
       expect(closed).to.equal(null);
     });
 
-    it("BLOCKS NFT-theft exploit: attacker-controlled seller_usdc_ata", async () => {
-      const { asset, buyer: seller } = await mintRegion(ctx, {
-        x: 150, y: 0, width: 1, height: 1,
-      });
-      await createListing(ctx, seller, asset.publicKey, {
-        startPrice: 5_000_000, endPrice: 5_000_000, durationSeconds: 3600,
-      });
-
-      const attacker = Keypair.generate();
-      await airdrop(ctx.provider.connection, attacker.publicKey);
-      const attackerAta = await fundUsdc(
-        ctx.provider, ctx.usdcMint, ctx.usdcMintAuthority, attacker.publicKey, usdc(50)
-      );
-
-      try {
-        await executePurchase(ctx, {
-          buyer: attacker,
-          seller: seller.publicKey,
-          asset: asset.publicKey,
-          buyerUsdcAta: attackerAta,
-          sellerUsdcAta: attackerAta,
-        });
-        expect.fail("exploit should have been blocked");
-      } catch (e) {
-        // The token::authority = seller constraint raises ConstraintTokenOwner.
-        expect(extractErrorName(e)).to.equal("ConstraintTokenOwner");
-      }
-    });
-
-    it("BLOCKS NFT-theft exploit: attacker-controlled treasury_usdc_ata", async () => {
+    it("BLOCKS NFT-theft exploit: attacker-controlled treasury", async () => {
       const { asset, buyer: seller } = await mintRegion(ctx, {
         x: 160, y: 0, width: 1, height: 1,
       });
       await createListing(ctx, seller, asset.publicKey, {
-        startPrice: 5_000_000, endPrice: 5_000_000, durationSeconds: 3600,
+        startPrice: sol(0.5), endPrice: sol(0.5), durationSeconds: 3600,
       });
 
       const attacker = Keypair.generate();
-      await airdrop(ctx.provider.connection, attacker.publicKey);
-      const [attackerAta, realSellerAta] = await Promise.all([
-        fundUsdc(ctx.provider, ctx.usdcMint, ctx.usdcMintAuthority, attacker.publicKey, usdc(50)),
-        createAta(ctx.provider, ctx.usdcMint, seller.publicKey),
-      ]);
+      await airdrop(ctx.provider.connection, attacker.publicKey, 5 * LAMPORTS_PER_SOL);
 
       try {
         await executePurchase(ctx, {
           buyer: attacker,
           seller: seller.publicKey,
           asset: asset.publicKey,
-          buyerUsdcAta: attackerAta,
-          sellerUsdcAta: realSellerAta,
-          treasuryUsdcAta: attackerAta,
+          treasury: attacker.publicKey,
         });
         expect.fail("exploit should have been blocked");
       } catch (e) {
         expect(extractErrorName(e)).to.equal("InvalidTreasury");
-      }
-    });
-
-    it("rejects wrong usdc_mint", async () => {
-      const { asset, buyer: seller } = await mintRegion(ctx, {
-        x: 170, y: 0, width: 1, height: 1,
-      });
-      await createListing(ctx, seller, asset.publicKey, {
-        startPrice: 5_000_000, endPrice: 5_000_000, durationSeconds: 3600,
-      });
-
-      const fakeMintAuthority = Keypair.generate();
-      const fakeMint = await createUsdcMint(ctx.provider, fakeMintAuthority);
-
-      const buyer = Keypair.generate();
-      await airdrop(ctx.provider.connection, buyer.publicKey);
-      const [buyerAta, sellerAta, treasuryFakeAta] = await Promise.all([
-        fundUsdc(ctx.provider, fakeMint, fakeMintAuthority, buyer.publicKey, usdc(50)),
-        createAta(ctx.provider, fakeMint, seller.publicKey),
-        createAta(ctx.provider, fakeMint, ctx.treasury.publicKey),
-      ]);
-
-      try {
-        await executePurchase(ctx, {
-          buyer,
-          seller: seller.publicKey,
-          asset: asset.publicKey,
-          buyerUsdcAta: buyerAta,
-          sellerUsdcAta: sellerAta,
-          treasuryUsdcAta: treasuryFakeAta,
-          usdcMint: fakeMint,
-        });
-        expect.fail("should have rejected wrong usdc_mint");
-      } catch (e) {
-        expect(extractErrorName(e)).to.equal("InvalidUsdcMint");
       }
     });
 
@@ -780,8 +639,8 @@ describe("solana-space", () => {
         x: 180, y: 0, width: 1, height: 1,
       });
 
-      const startPrice = 30_000_000n;
-      const endPrice = 10_000_000n;
+      const startPrice = sol(3);
+      const endPrice = sol(1);
 
       await createListing(ctx, seller, asset.publicKey, {
         startPrice, endPrice, durationSeconds: 60,
@@ -791,36 +650,31 @@ describe("solana-space", () => {
       await new Promise((r) => setTimeout(r, 2500));
 
       const buyer = Keypair.generate();
-      await airdrop(ctx.provider.connection, buyer.publicKey);
-      const [buyerAta, sellerAta] = await Promise.all([
-        fundUsdc(ctx.provider, ctx.usdcMint, ctx.usdcMintAuthority, buyer.publicKey, startPrice),
-        createAta(ctx.provider, ctx.usdcMint, seller.publicKey),
-      ]);
+      await airdrop(ctx.provider.connection, buyer.publicKey, 5 * LAMPORTS_PER_SOL);
 
-      const [treasuryBefore, sellerBefore, buyerBefore] = await Promise.all([
-        usdcBalance(ctx.provider, ctx.treasuryAta),
-        usdcBalance(ctx.provider, sellerAta),
-        usdcBalance(ctx.provider, buyerAta),
+      const [treasuryBefore, buyerBefore] = await Promise.all([
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
+        lamportBalance(ctx.provider.connection, buyer.publicKey),
       ]);
 
       await executePurchase(ctx, {
-        buyer, seller: seller.publicKey, asset: asset.publicKey, buyerUsdcAta: buyerAta, sellerUsdcAta: sellerAta,
+        buyer, seller: seller.publicKey, asset: asset.publicKey,
       });
 
-      const [buyerAfter, treasuryAfter, sellerAfter] = await Promise.all([
-        usdcBalance(ctx.provider, buyerAta),
-        usdcBalance(ctx.provider, ctx.treasuryAta),
-        usdcBalance(ctx.provider, sellerAta),
+      const [buyerAfter, treasuryAfter] = await Promise.all([
+        lamportBalance(ctx.provider.connection, buyer.publicKey),
+        lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
       ]);
 
-      const paid = buyerBefore - buyerAfter;
-      const feeCollected = treasuryAfter - treasuryBefore;
-      const sellerGained = sellerAfter - sellerBefore;
+      // Buyer paid at least endPrice + fee, less than startPrice + fee (+ tx fees).
+      const spent = buyerBefore - buyerAfter;
+      expect(spent > endPrice).to.equal(true);
+      expect(spent < startPrice + sol(0.01)).to.equal(true);
 
-      expect(paid > endPrice).to.equal(true);
-      expect(paid < startPrice).to.equal(true);
-      expect(feeCollected + sellerGained).to.equal(paid);
-      expect(feeCollected).to.equal((paid * FEE_BPS) / BPS_DENOM);
+      const feeCollected = treasuryAfter - treasuryBefore;
+      // Fee is based on paid price (startPrice..endPrice window).
+      expect(feeCollected >= (endPrice * FEE_BPS) / BPS_DENOM).to.equal(true);
+      expect(feeCollected <= (startPrice * FEE_BPS) / BPS_DENOM).to.equal(true);
     });
   });
 });

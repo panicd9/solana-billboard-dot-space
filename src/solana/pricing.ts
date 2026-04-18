@@ -7,7 +7,7 @@ import {
   CURVE_START_PRICE,
   CURVE_END_PRICE,
   CURVE_TOTAL_BLOCKS,
-  USDC_DECIMALS,
+  SOL_DECIMALS,
 } from "./constants";
 
 export function isCenterZone(x: number, y: number): boolean {
@@ -39,10 +39,7 @@ export function countCenterAndCurveBlocks(
   return { centerCount: BigInt(centerCount), curveCount: BigInt(curveCount) };
 }
 
-/**
- * Calculate the total price in USDC lamports for a region.
- * Mirrors the on-chain calculate_region_price function exactly.
- */
+// Mirrors the on-chain calculate_region_price function exactly.
 export function calculateRegionPrice(
   x: number,
   y: number,
@@ -73,14 +70,15 @@ export function calculateRegionPrice(
   return centerTotal + curveTotal;
 }
 
-/** Format USDC lamports as a human-readable string */
-export function formatUsdc(lamports: bigint): string {
-  const units = Number(lamports) / 10 ** USDC_DECIMALS;
-  if (units < 0.01) return units.toFixed(4);
-  return units.toFixed(2);
+export function formatSol(lamports: bigint): string {
+  const units = Number(lamports) / 10 ** SOL_DECIMALS;
+  if (units === 0) return "0";
+  if (units < 0.0001) return units.toFixed(6);
+  if (units < 0.01) return units.toFixed(5);
+  if (units < 1) return units.toFixed(4);
+  return units.toFixed(3);
 }
 
-/** Calculate current Dutch auction price for a listing */
 export function calculateListingCurrentPrice(
   startPrice: bigint,
   endPrice: bigint,

@@ -1,4 +1,4 @@
-  use anchor_lang::prelude::*;
+use anchor_lang::prelude::*;
 use mpl_core::instructions::CreateCollectionV2CpiBuilder;
 use crate::constants::*;
 use crate::state::CanvasState;
@@ -6,7 +6,6 @@ use crate::state::CanvasState;
 #[derive(AnchorDeserialize, AnchorSerialize)]
 pub struct InitializeArgs {
     pub treasury: Pubkey,
-    pub usdc_mint: Pubkey,
     pub collection_uri: String,
 }
 
@@ -40,18 +39,13 @@ pub fn initialize_handler(ctx: Context<Initialize>, args: InitializeArgs) -> Res
     let mut canvas_state = ctx.accounts.canvas_state.load_init()?;
     canvas_state.authority = ctx.accounts.authority.key();
     canvas_state.treasury = args.treasury;
-    canvas_state.usdc_mint = args.usdc_mint;
     canvas_state.collection = ctx.accounts.collection.key();
     canvas_state.total_minted = 0;
     canvas_state.bump = ctx.bumps.canvas_state;
-    // bitmap is zero-initialized (all blocks free)
     let bump = canvas_state.bump;
 
-    // Release the mutable borrow before CPI
     drop(canvas_state);
 
-    // Create Metaplex Core Collection via CPI
-    // canvas_state PDA is the update authority for the collection
     let signer_seeds: &[&[u8]] = &[CANVAS_SEED, &[bump]];
 
     CreateCollectionV2CpiBuilder::new(&ctx.accounts.mpl_core_program.to_account_info())

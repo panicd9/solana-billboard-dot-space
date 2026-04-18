@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use anchor_lang::system_program::{self, Transfer};
 use crate::constants::*;
 use crate::error::ErrorCode;
 use crate::state::{Boosts, CanvasState};
@@ -39,41 +39,18 @@ pub struct BuyBoost<'info> {
     )]
     pub boosts: Account<'info, Boosts>,
 
-    // --- USDC payment accounts ---
-    pub usdc_mint: InterfaceAccount<'info, Mint>,
+    /// SOL recipient for the boost payment.
+    /// CHECK: Validated in handler against canvas_state.treasury.
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
 
-    #[account(
-        mut,
-        associated_token::mint = usdc_mint,
-        associated_token::authority = payer,
-    )]
-    pub payer_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        token::mint = usdc_mint,
-    )]
-    pub treasury_usdc_ata: InterfaceAccount<'info, TokenAccount>,
-
-    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
 const ALL_BOOSTS: u8 = BOOST_HIGHLIGHTED | BOOST_GLOWING | BOOST_TRENDING;
 
-/// Sum the USDC cost for each set bit in the flags bitmask.
 fn total_boost_price(flags: u8) -> u64 {
-    let mut total: u64 = 0;
-    if flags & BOOST_HIGHLIGHTED != 0 {
-        total += BOOST_PRICE_HIGHLIGHTED;
-    }
-    if flags & BOOST_GLOWING != 0 {
-        total += BOOST_PRICE_GLOWING;
-    }
-    if flags & BOOST_TRENDING != 0 {
-        total += BOOST_PRICE_TRENDING;
-    }
-    total
+    u64::from(flags.count_ones()) * BOOST_PRICE
 }
 
 pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<()> {
@@ -82,7 +59,7 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
     // 1. Validate at least one valid boost is requested and no unknown bits are set
     require!(flags != 0 && flags & !ALL_BOOSTS == 0, ErrorCode::InvalidBoostType);
 
-    // 2. Validate collection and USDC mint
+    // 2. Validate collection + treasury
     {
         let canvas_state = ctx.accounts.canvas_state.load()?;
         require!(
@@ -90,11 +67,7 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
             ErrorCode::InvalidCollection
         );
         require!(
-            ctx.accounts.usdc_mint.key() == canvas_state.usdc_mint,
-            ErrorCode::InvalidUsdcMint
-        );
-        require!(
-            ctx.accounts.treasury_usdc_ata.owner == canvas_state.treasury,
+            ctx.accounts.treasury.key() == canvas_state.treasury,
             ErrorCode::InvalidTreasury
         );
     }
@@ -129,16 +102,16 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
         boosts.flags = 0;
     }
 
-    // 6. Calculate total price and transfer USDC from payer to treasury
+    // 6. Calculate total price and transfer SOL from payer to treasury
     let price = total_boost_price(flags);
-    let transfer_accounts = TransferChecked {
-        from: ctx.accounts.payer_usdc_ata.to_account_info(),
-        mint: ctx.accounts.usdc_mint.to_account_info(),
-        to: ctx.accounts.treasury_usdc_ata.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
-    };
-    let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), transfer_accounts);
-    token_interface::transfer_checked(cpi_ctx, price, USDC_DECIMALS)?;
+    let cpi_ctx = CpiContext::new(
+        ctx.accounts.system_program.to_account_info(),
+        Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.treasury.to_account_info(),
+        },
+    );
+    system_program::transfer(cpi_ctx, price)?;
 
     // 7. Set all requested boost flags at once
     boosts.flags |= flags;

@@ -4,7 +4,7 @@ A Solana-powered pixel marketplace where users purchase rectangular grid regions
 
 ## How It Works
 
-The canvas is a 192x108 grid of 10px blocks. Users select a rectangular area, pay with USDC, and receive a Metaplex Core NFT representing ownership. Owners can upload images, set external links, list regions for sale on the marketplace, or purchase boosts (highlight, glow, trending) to increase visibility.
+The canvas is a 192x108 grid of 10px blocks. Users select a rectangular area, pay with native SOL, and receive a Metaplex Core NFT representing ownership. Owners can upload images, set external links, list regions for sale on the marketplace, or purchase boosts (highlight, glow, trending) to increase visibility.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ The canvas is a 192x108 grid of 10px blocks. Users select a rectangular area, pa
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui |
 | Solana Client | @solana/kit, @solana/react-hooks, @solana/client |
 | Smart Contract | Rust, Anchor 0.31, Metaplex Core |
-| Payments | USDC (SPL Token) |
+| Payments | Native SOL |
 | Storage | IPFS via Pinata |
 | Testing | Vitest |
 
@@ -63,9 +63,8 @@ Edit `.env` with your values:
 VITE_SOLANA_NETWORK=devnet
 VITE_RPC_URL=                              # Optional, defaults based on network
 VITE_PROGRAM_ID=DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2
-VITE_USDC_MINT=Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr
-VITE_COLLECTION_ADDRESS=                   # From setup script output
-VITE_TREASURY_USDC_ATA=                    # From setup script output
+VITE_COLLECTION_ADDRESS=                   # From initialize script output
+VITE_TREASURY=                             # SOL recipient pubkey
 VITE_PINATA_JWT=                           # Your Pinata API key
 VITE_PINATA_GATEWAY=                       # Your Pinata gateway domain
 ```
@@ -76,13 +75,13 @@ VITE_PINATA_GATEWAY=                       # Your Pinata gateway domain
 # Build the Anchor program
 cd solana-space && anchor build && cd ..
 
-# Run the devnet setup (airdrops SOL, creates treasury ATA, initializes program)
-npx tsx solana-space/scripts/setup-usdc-dev.ts --devnet
+# Initialize the program (creates CanvasState + Metaplex Core collection)
+TREASURY=<your-treasury-pubkey> npx tsx solana-space/scripts/initialize.ts --devnet
 ```
 
-The script outputs `VITE_COLLECTION_ADDRESS` and `VITE_TREASURY_USDC_ATA` — add them to your `.env`.
+The script prints `VITE_COLLECTION_ADDRESS` — add it (and your `VITE_TREASURY`) to your `.env`.
 
-Fund your wallet with devnet USDC via the [Circle Faucet](https://faucet.circle.com/).
+Fund your wallet with devnet SOL via `solana airdrop` or the [Solana Faucet](https://faucet.solana.com/).
 
 ### 4. Start Development Server
 
@@ -98,11 +97,9 @@ For local development with [Surfpool](https://github.com/txtx/surfpool):
 
 ```bash
 surfpool start
-npx tsx solana-space/scripts/setup-usdc-dev.ts          # defaults to localnet
+TREASURY=<pubkey> npx tsx solana-space/scripts/initialize.ts          # defaults to localnet
 npm run dev
 ```
-
-The localnet setup clones the USDC-dev mint from devnet and funds wallets automatically.
 
 ## Commands
 
@@ -117,13 +114,15 @@ npm run test:watch   # Watch mode (vitest)
 
 ## Pricing Model
 
-**Center zone** (60x34 blocks at canvas center): fixed 0.12 USDC per block.
+**Center zone** (60x34 blocks at canvas center): fixed 0.0004 SOL per block.
 
-**Outer zone** (remaining 18,696 blocks): linear bonding curve from 0.01 to 0.10 USDC per block, increasing as more blocks are sold.
+**Outer zone** (remaining 18,696 blocks): linear bonding curve from 0.00004 to 0.0004 SOL per block, increasing as more blocks are sold.
 
-**Boosts**: Highlighted (1 USDC), Glowing Border (2 USDC), Trending (5 USDC).
+**Boosts**: Highlighted (0.015 SOL), Glowing Border (0.015 SOL), Trending (0.015 SOL).
 
-**Marketplace fee**: 2.5% on secondary sales.
+**Marketplace fee**: 4% on secondary sales.
+
+Full saturation cost: ~5 SOL.
 
 ## On-Chain Program
 

@@ -7,9 +7,9 @@ pub struct Listing {
     pub seller: Pubkey,
     /// The Metaplex Core asset being sold
     pub asset: Pubkey,
-    /// Starting price in USDC lamports (6 decimals)
+    /// Starting price in SOL lamports
     pub start_price: u64,
-    /// Ending price in USDC lamports (6 decimals)
+    /// Ending price in SOL lamports
     pub end_price: u64,
     /// Unix timestamp when the price curve starts
     pub start_time: i64,
@@ -43,7 +43,6 @@ impl Listing {
         let duration = (self.end_time - self.start_time) as u128;
 
         if self.end_price > self.start_price {
-            // Increasing price: start + (end - start) * elapsed / duration
             let diff = (self.end_price - self.start_price) as u128;
             let delta = diff
                 .checked_mul(elapsed)
@@ -51,7 +50,6 @@ impl Listing {
                 / duration;
             Ok(self.start_price + delta as u64)
         } else {
-            // Decreasing price: start - (start - end) * elapsed / duration
             let diff = (self.start_price - self.end_price) as u128;
             let delta = diff
                 .checked_mul(elapsed)
