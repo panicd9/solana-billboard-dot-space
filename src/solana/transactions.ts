@@ -195,7 +195,8 @@ export async function cancelListing(
 export async function executePurchase(
   signer: TransactionSigner,
   sellerAddress: string,
-  assetAddress: string
+  assetAddress: string,
+  maxPrice: bigint
 ): Promise<string> {
   const ix = await getExecutePurchaseInstructionAsync({
     buyer: signer,
@@ -203,6 +204,7 @@ export async function executePurchase(
     asset: assetAddress as Address,
     collection: COLLECTION_ADDRESS,
     treasury: TREASURY,
+    maxPrice,
   });
 
   return buildAndSend(signer, [ix]);

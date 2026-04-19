@@ -63,4 +63,7 @@ pub enum ErrorCode {
 
     #[msg("NFT is currently listed on the marketplace")]
     AssetIsListed,
+
+    #[msg("Current price exceeds buyer's maximum price (slippage)")]
+    SlippageExceeded,
 }

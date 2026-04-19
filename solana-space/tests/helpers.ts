@@ -218,6 +218,7 @@ export interface PurchaseAccounts {
   buyer: Keypair;
   seller: PublicKey;
   asset: PublicKey;
+  maxPrice: bigint | number;
   treasury?: PublicKey;
   collection?: PublicKey;
 }
@@ -227,7 +228,7 @@ export async function executePurchase(
   p: PurchaseAccounts
 ): Promise<string> {
   return await ctx.program.methods
-    .executePurchase()
+    .executePurchase({ maxPrice: new anchor.BN(p.maxPrice.toString()) })
     .accounts({
       buyer: p.buyer.publicKey,
       seller: p.seller,

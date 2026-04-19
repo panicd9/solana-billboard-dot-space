@@ -5,6 +5,11 @@ use crate::constants::*;
 use crate::error::ErrorCode;
 use crate::state::{CanvasState, Listing};
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct ExecutePurchaseArgs {
+    pub max_price: u64,
+}
+
 #[derive(Accounts)]
 pub struct ExecutePurchase<'info> {
     #[account(mut)]
@@ -53,7 +58,10 @@ pub struct ExecutePurchase<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
+pub fn execute_purchase_handler(
+    ctx: Context<ExecutePurchase>,
+    args: ExecutePurchaseArgs,
+) -> Result<()> {
     let listing = &ctx.accounts.listing;
 
     // 1. Validate collection + treasury
@@ -72,6 +80,9 @@ pub fn execute_purchase_handler(ctx: Context<ExecutePurchase>) -> Result<()> {
     // 2. Calculate current price via linear interpolation
     let clock = Clock::get()?;
     let price = listing.current_price(clock.unix_timestamp)?;
+
+    // 2a. Enforce buyer-supplied slippage cap
+    require!(price <= args.max_price, ErrorCode::SlippageExceeded);
 
     // 3. Calculate marketplace fee and seller proceeds
     let fee = (price as u128)

@@ -600,6 +600,7 @@ describe("solana-space", () => {
 
       await executePurchase(ctx, {
         buyer, seller: seller.publicKey, asset: asset.publicKey,
+        maxPrice: price,
       });
 
       const listing = listingPda(ctx.program.programId, asset.publicKey);
@@ -633,6 +634,7 @@ describe("solana-space", () => {
           seller: seller.publicKey,
           asset: asset.publicKey,
           treasury: attacker.publicKey,
+          maxPrice: sol(1),
         });
         expect.fail("exploit should have been blocked");
       } catch (e) {
@@ -665,6 +667,7 @@ describe("solana-space", () => {
 
       await executePurchase(ctx, {
         buyer, seller: seller.publicKey, asset: asset.publicKey,
+        maxPrice: startPrice,
       });
 
       const [buyerAfter, treasuryAfter] = await Promise.all([
@@ -681,6 +684,50 @@ describe("solana-space", () => {
       // Fee is based on paid price (startPrice..endPrice window).
       expect(feeCollected >= (endPrice * FEE_BPS) / BPS_DENOM).to.equal(true);
       expect(feeCollected <= (startPrice * FEE_BPS) / BPS_DENOM).to.equal(true);
+    });
+
+    it("rejects with SlippageExceeded when maxPrice is below current price", async () => {
+      const { asset, buyer: seller } = await mintRegion(ctx, {
+        x: 190, y: 0, width: 1, height: 1,
+      });
+      const price = sol(1);
+      await createListing(ctx, seller, asset.publicKey, {
+        startPrice: price, endPrice: price, durationSeconds: 3600,
+      });
+
+      const buyer = Keypair.generate();
+      await airdrop(ctx.provider.connection, buyer.publicKey, 5 * LAMPORTS_PER_SOL);
+
+      try {
+        await executePurchase(ctx, {
+          buyer, seller: seller.publicKey, asset: asset.publicKey,
+          maxPrice: price - 1n,
+        });
+        expect.fail("should have been rejected for slippage");
+      } catch (e) {
+        expect(extractErrorName(e)).to.equal("SlippageExceeded");
+      }
+    });
+
+    it("passes when maxPrice exactly equals current price", async () => {
+      const { asset, buyer: seller } = await mintRegion(ctx, {
+        x: 0, y: 10, width: 1, height: 1,
+      });
+      const price = sol(1);
+      await createListing(ctx, seller, asset.publicKey, {
+        startPrice: price, endPrice: price, durationSeconds: 3600,
+      });
+
+      const buyer = Keypair.generate();
+      await airdrop(ctx.provider.connection, buyer.publicKey, 5 * LAMPORTS_PER_SOL);
+
+      await executePurchase(ctx, {
+        buyer, seller: seller.publicKey, asset: asset.publicKey,
+        maxPrice: price,
+      });
+
+      const nftOwner = await readAssetOwner(ctx.provider, asset.publicKey);
+      expect(nftOwner.toBase58()).to.equal(buyer.publicKey.toBase58());
     });
   });
 });

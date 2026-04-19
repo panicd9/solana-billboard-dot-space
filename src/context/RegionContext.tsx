@@ -43,7 +43,7 @@ interface RegionContextType {
   unlistRegion: (assetAddress: string) => Promise<void>;
   buyListedRegion: (
     assetAddress: string,
-    sellerAddress: string
+    expectedPrice: bigint
   ) => Promise<void>;
   buyBoost: (assetAddress: string, boostFlags: number) => Promise<void>;
   calculatePrice: (sel: Selection) => { lamports: bigint; display: string };
@@ -285,10 +285,10 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const buyListedRegion = useCallback(
-    async (assetAddress: string, sellerAddress: string) => {
+    async (assetAddress: string, expectedPrice: bigint) => {
       await executePurchaseMutation.mutateAsync({
-        sellerAddress,
         assetAddress,
+        expectedPrice,
       });
     },
     [executePurchaseMutation]

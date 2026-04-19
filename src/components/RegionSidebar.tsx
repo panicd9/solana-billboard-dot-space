@@ -133,8 +133,8 @@ const RegionSidebar = () => {
   };
 
   const handleBuy = () => {
-    if (!r.listing) return;
-    withBusy("buy", () => buyListedRegion(r.id, r.listing!.seller));
+    if (!r.listing || currentListingPrice === null) return;
+    withBusy("buy", () => buyListedRegion(r.id, currentListingPrice));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

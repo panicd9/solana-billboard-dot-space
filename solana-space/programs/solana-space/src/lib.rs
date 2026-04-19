@@ -35,8 +35,11 @@ pub mod solana_space {
         instructions::create_listing::create_listing_handler(ctx, args)
     }
 
-    pub fn execute_purchase(ctx: Context<ExecutePurchase>) -> Result<()> {
-        instructions::execute_purchase::execute_purchase_handler(ctx)
+    pub fn execute_purchase(
+        ctx: Context<ExecutePurchase>,
+        args: ExecutePurchaseArgs,
+    ) -> Result<()> {
+        instructions::execute_purchase::execute_purchase_handler(ctx, args)
     }
 
     pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {

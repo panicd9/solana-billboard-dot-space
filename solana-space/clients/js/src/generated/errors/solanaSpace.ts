@@ -54,6 +54,8 @@ export const SOLANA_SPACE_ERROR__INVALID_DURATION = 0x1781; // 6017
 export const SOLANA_SPACE_ERROR__UNAUTHORIZED_CANCEL = 0x1782; // 6018
 /** AssetIsListed: NFT is currently listed on the marketplace */
 export const SOLANA_SPACE_ERROR__ASSET_IS_LISTED = 0x1783; // 6019
+/** SlippageExceeded: Current price exceeds buyer's maximum price (slippage) */
+export const SOLANA_SPACE_ERROR__SLIPPAGE_EXCEEDED = 0x1784; // 6020
 
 export type SolanaSpaceError =
   | typeof SOLANA_SPACE_ERROR__ARITHMETIC_OVERFLOW
@@ -73,6 +75,7 @@ export type SolanaSpaceError =
   | typeof SOLANA_SPACE_ERROR__NOT_ASSET_OWNER
   | typeof SOLANA_SPACE_ERROR__REGION_OCCUPIED
   | typeof SOLANA_SPACE_ERROR__REGION_OUT_OF_BOUNDS
+  | typeof SOLANA_SPACE_ERROR__SLIPPAGE_EXCEEDED
   | typeof SOLANA_SPACE_ERROR__UNAUTHORIZED_CANCEL
   | typeof SOLANA_SPACE_ERROR__UNAUTHORIZED_OWNER
   | typeof SOLANA_SPACE_ERROR__URI_TOO_LONG;
@@ -97,6 +100,7 @@ if (process.env.NODE_ENV !== "production") {
     [SOLANA_SPACE_ERROR__NOT_ASSET_OWNER]: `Only the NFT owner can create a listing`,
     [SOLANA_SPACE_ERROR__REGION_OCCUPIED]: `One or more blocks in this region are already occupied`,
     [SOLANA_SPACE_ERROR__REGION_OUT_OF_BOUNDS]: `Region extends beyond grid boundaries`,
+    [SOLANA_SPACE_ERROR__SLIPPAGE_EXCEEDED]: `Current price exceeds buyer's maximum price (slippage)`,
     [SOLANA_SPACE_ERROR__UNAUTHORIZED_CANCEL]: `Only the seller can cancel the listing`,
     [SOLANA_SPACE_ERROR__UNAUTHORIZED_OWNER]: `Only the NFT owner can update the region`,
     [SOLANA_SPACE_ERROR__URI_TOO_LONG]: `URI exceeds maximum length`,

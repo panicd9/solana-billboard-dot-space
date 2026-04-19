@@ -16,6 +16,8 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  getU64Decoder,
+  getU64Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
@@ -103,13 +105,17 @@ export type ExecutePurchaseInstruction<
 
 export type ExecutePurchaseInstructionData = {
   discriminator: ReadonlyUint8Array;
+  maxPrice: bigint;
 };
 
-export type ExecutePurchaseInstructionDataArgs = {};
+export type ExecutePurchaseInstructionDataArgs = { maxPrice: number | bigint };
 
 export function getExecutePurchaseInstructionDataEncoder(): FixedSizeEncoder<ExecutePurchaseInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["maxPrice", getU64Encoder()],
+    ]),
     (value) => ({ ...value, discriminator: EXECUTE_PURCHASE_DISCRIMINATOR }),
   );
 }
@@ -117,6 +123,7 @@ export function getExecutePurchaseInstructionDataEncoder(): FixedSizeEncoder<Exe
 export function getExecutePurchaseInstructionDataDecoder(): FixedSizeDecoder<ExecutePurchaseInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["maxPrice", getU64Decoder()],
   ]);
 }
 
@@ -154,6 +161,7 @@ export type ExecutePurchaseAsyncInput<
   treasury: Address<TAccountTreasury>;
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
+  maxPrice: ExecutePurchaseInstructionDataArgs["maxPrice"];
 };
 
 export async function getExecutePurchaseInstructionAsync<
@@ -214,6 +222,9 @@ export async function getExecutePurchaseInstructionAsync<
     ResolvedInstructionAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   // Resolve default values.
   if (!accounts.canvasState.value) {
     accounts.canvasState.value = await getProgramDerivedAddress({
@@ -261,7 +272,9 @@ export async function getExecutePurchaseInstructionAsync<
       getAccountMeta("mplCoreProgram", accounts.mplCoreProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
-    data: getExecutePurchaseInstructionDataEncoder().encode({}),
+    data: getExecutePurchaseInstructionDataEncoder().encode(
+      args as ExecutePurchaseInstructionDataArgs,
+    ),
     programAddress,
   } as ExecutePurchaseInstruction<
     TProgramAddress,
@@ -301,6 +314,7 @@ export type ExecutePurchaseInput<
   treasury: Address<TAccountTreasury>;
   mplCoreProgram?: Address<TAccountMplCoreProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
+  maxPrice: ExecutePurchaseInstructionDataArgs["maxPrice"];
 };
 
 export function getExecutePurchaseInstruction<
@@ -359,6 +373,9 @@ export function getExecutePurchaseInstruction<
     ResolvedInstructionAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   // Resolve default values.
   if (!accounts.mplCoreProgram.value) {
     accounts.mplCoreProgram.value =
@@ -382,7 +399,9 @@ export function getExecutePurchaseInstruction<
       getAccountMeta("mplCoreProgram", accounts.mplCoreProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
     ],
-    data: getExecutePurchaseInstructionDataEncoder().encode({}),
+    data: getExecutePurchaseInstructionDataEncoder().encode(
+      args as ExecutePurchaseInstructionDataArgs,
+    ),
     programAddress,
   } as ExecutePurchaseInstruction<
     TProgramAddress,

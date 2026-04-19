@@ -13,7 +13,9 @@ import {
   BOOST_TRENDING,
 } from "@/solana/constants";
 import { BOOST_DURATION_SECONDS, isBoostActive } from "@/types/region";
-import { ipfsToGateway } from "@/solana/accounts";
+import { fetchListing, ipfsToGateway } from "@/solana/accounts";
+import { calculateListingCurrentPrice } from "@/solana/pricing";
+import type { Address } from "@solana/kit";
 
 function useWalletSigner(): TransactionSigner | null {
   const session = useWalletSession();
@@ -243,22 +245,55 @@ export function useCancelListing() {
   });
 }
 
+// Buyer's slippage buffer over the displayed current price (basis points).
+// 100 bps = 1% — tolerates small Clock drift + ascending-auction price movement
+// during wallet signing without letting the seller raise the price arbitrarily.
+const SLIPPAGE_BUFFER_BPS = 100n;
+
 export function useExecutePurchase() {
   const signer = useWalletSigner();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: {
-      sellerAddress: string;
       assetAddress: string;
+      expectedPrice: bigint;
     }) => {
       if (!signer) throw new Error("Wallet not connected");
+
+      // Fetch the canonical listing from-chain right before signing. Avoids
+      // using a react-query-cached seller (which can be up to staleTime old)
+      // and surfaces "listing gone" with a clear error instead of a raw
+      // Anchor has_one constraint failure.
+      const listingAccount = await fetchListing(params.assetAddress as Address);
+      if (!listingAccount.exists) {
+        throw new Error("Listing no longer exists (was it cancelled or purchased?)");
+      }
+      const listing = listingAccount.data;
+      const sellerAddress = listing.seller as string;
+
+      // Cap at displayed price + SLIPPAGE_BUFFER_BPS; also sanity-check that
+      // the fresh on-chain price is still within bounds before the round-trip.
+      const maxPrice =
+        params.expectedPrice + (params.expectedPrice * SLIPPAGE_BUFFER_BPS) / 10_000n;
+      const freshPrice = calculateListingCurrentPrice(
+        listing.startPrice,
+        listing.endPrice,
+        listing.startTime,
+        listing.endTime,
+      );
+      if (freshPrice > maxPrice) {
+        throw new Error(
+          `Listing price moved above your cap (${freshPrice} > ${maxPrice} lamports). Refresh and try again.`,
+        );
+      }
 
       toast.info("Confirm transaction in your wallet...");
       const signature = await tx.executePurchase(
         signer,
-        params.sellerAddress,
-        params.assetAddress
+        sellerAddress,
+        params.assetAddress,
+        maxPrice,
       );
       return { signature, buyerAddress: signer.address as string };
     },
