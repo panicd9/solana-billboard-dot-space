@@ -17,34 +17,48 @@ export interface AppConfig {
   useDAS: boolean;
 }
 
-const DEFAULT_RPC: Record<SolanaNetwork, string> = {
-  devnet: "https://api.devnet.solana.com",
-  localnet: "http://127.0.0.1:8899",
-  "mainnet-beta": "https://api.mainnet-beta.solana.com",
-};
+const VALID_NETWORKS: SolanaNetwork[] = ["devnet", "localnet", "mainnet-beta"];
 
-const DEFAULT_WS: Record<SolanaNetwork, string> = {
-  devnet: "wss://api.devnet.solana.com",
-  localnet: "ws://127.0.0.1:8900",
-  "mainnet-beta": "wss://api.mainnet-beta.solana.com",
-};
+function requireVar(name: string, value: string | undefined): string {
+  const v = (value ?? "").trim();
+  if (!v) {
+    throw new Error(
+      `Config error: ${name} is required (no fallback). Check your .env file.`
+    );
+  }
+  return v;
+}
 
 function deriveWsUrl(rpcUrl: string): string {
-  return rpcUrl.replace("https://", "wss://").replace("http://", "ws://");
+  return rpcUrl.replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://");
 }
 
 function getConfig(): AppConfig {
-  const network = (import.meta.env.VITE_SOLANA_NETWORK || "devnet") as SolanaNetwork;
-  const rpcUrl = import.meta.env.VITE_RPC_URL || DEFAULT_RPC[network];
+  const network = requireVar("VITE_SOLANA_NETWORK", import.meta.env.VITE_SOLANA_NETWORK) as SolanaNetwork;
+  if (!VALID_NETWORKS.includes(network)) {
+    throw new Error(
+      `Config error: VITE_SOLANA_NETWORK="${network}" is invalid. Must be one of: ${VALID_NETWORKS.join(", ")}.`
+    );
+  }
+
+  const rpcUrl = requireVar("VITE_RPC_URL", import.meta.env.VITE_RPC_URL);
+  const programId = requireVar("VITE_PROGRAM_ID", import.meta.env.VITE_PROGRAM_ID);
+  const collectionAddress = requireVar("VITE_COLLECTION_ADDRESS", import.meta.env.VITE_COLLECTION_ADDRESS);
+  const treasury = requireVar("VITE_TREASURY", import.meta.env.VITE_TREASURY);
+  const pinataJwt = requireVar("VITE_PINATA_JWT", import.meta.env.VITE_PINATA_JWT);
+  const pinataGateway = requireVar("VITE_PINATA_GATEWAY", import.meta.env.VITE_PINATA_GATEWAY);
+
+  const wsUrl = (import.meta.env.VITE_WS_URL ?? "").trim() || deriveWsUrl(rpcUrl);
+
   return {
     network,
     rpcUrl,
-    wsUrl: import.meta.env.VITE_WS_URL || DEFAULT_WS[network] || deriveWsUrl(rpcUrl),
-    programId: import.meta.env.VITE_PROGRAM_ID || "DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2",
-    collectionAddress: import.meta.env.VITE_COLLECTION_ADDRESS || "",
-    treasury: import.meta.env.VITE_TREASURY || "",
-    pinataJwt: import.meta.env.VITE_PINATA_JWT || "",
-    pinataGateway: import.meta.env.VITE_PINATA_GATEWAY || "",
+    wsUrl,
+    programId,
+    collectionAddress,
+    treasury,
+    pinataJwt,
+    pinataGateway,
     useDAS: import.meta.env.VITE_USE_DAS === "true",
   };
 }

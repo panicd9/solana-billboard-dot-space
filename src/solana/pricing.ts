@@ -70,6 +70,25 @@ export function calculateRegionPrice(
   return centerTotal + curveTotal;
 }
 
+// Max accepted listing price: 1,000,000 SOL. Rejects Infinity, negatives,
+// scientific notation, and precision loss past 9 decimals.
+export const MAX_LISTING_LAMPORTS = 1_000_000n * 1_000_000_000n;
+
+export function parseSolInputToLamports(input: string): bigint | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+
+  const [whole, frac = ""] = trimmed.split(".");
+  if (frac.length > SOL_DECIMALS) return null;
+  const padded = frac.padEnd(SOL_DECIMALS, "0");
+  const combined = `${whole}${padded}`.replace(/^0+(?=\d)/, "");
+  const lamports = BigInt(combined || "0");
+  if (lamports <= 0n) return null;
+  if (lamports > MAX_LISTING_LAMPORTS) return null;
+  return lamports;
+}
+
 export function formatSol(lamports: bigint): string {
   const units = Number(lamports) / 10 ** SOL_DECIMALS;
   if (units === 0) return "0";

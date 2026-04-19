@@ -34,11 +34,15 @@ import {
   boostSecondsRemaining,
   formatBoostCountdown,
 } from "@/types/region";
-import { SOL_DECIMALS } from "@/solana/constants";
 import { BOOST_META_LIST, getBoostDescription } from "@/lib/boosts";
 import { useNowSeconds } from "@/hooks/useNow";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
+import {
+  calculateListingCurrentPrice,
+  formatSol,
+  parseSolInputToLamports,
+} from "@/solana/pricing";
+import { sanitizeExternalUrl } from "@/lib/urls";
 import { useWalletConnection } from "@solana/react-hooks";
 
 const RegionSidebar = () => {
@@ -106,23 +110,21 @@ const RegionSidebar = () => {
   };
 
   const handleList = () => {
-    const sp = parseFloat(startPrice);
-    const ep = parseFloat(endPrice);
+    const spLamports = parseSolInputToLamports(startPrice);
+    const epLamports = parseSolInputToLamports(endPrice);
+    if (spLamports === null) {
+      toast.error("Enter a valid start price (max 1,000,000 SOL, up to 9 decimals)");
+      return;
+    }
+    if (epLamports === null) {
+      toast.error("Enter a valid end price (max 1,000,000 SOL, up to 9 decimals)");
+      return;
+    }
     const dur = parseInt(duration);
-    if (isNaN(sp) || sp <= 0) {
-      toast.error("Enter a valid start price");
-      return;
-    }
-    if (isNaN(ep) || ep <= 0) {
-      toast.error("Enter a valid end price");
-      return;
-    }
     if (isNaN(dur) || dur <= 0) {
       toast.error("Enter a valid duration");
       return;
     }
-    const spLamports = BigInt(Math.round(sp * 10 ** SOL_DECIMALS));
-    const epLamports = BigInt(Math.round(ep * 10 ** SOL_DECIMALS));
     withBusy("list", () => listRegion(r.id, spLamports, epLamports, BigInt(dur)));
   };
 
@@ -143,8 +145,13 @@ const RegionSidebar = () => {
   };
 
   const handleSaveLink = () => {
+    const trimmed = linkValue.trim();
+    if (trimmed && !sanitizeExternalUrl(trimmed)) {
+      toast.error("Link must be a valid http:// or https:// URL");
+      return;
+    }
     withBusy("link", async () => {
-      await setRegionLink(r.id, linkValue);
+      await setRegionLink(r.id, trimmed);
       setEditingLink(false);
     });
   };
@@ -262,19 +269,31 @@ const RegionSidebar = () => {
               : "Not listed"}
           </span>
         </div>
-        {r.linkUrl && (
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">URL</span>
-            <a
-              href={r.linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline text-xs truncate max-w-[140px]"
-            >
-              {r.linkUrl}
-            </a>
-          </div>
-        )}
+        {r.linkUrl && (() => {
+          const safeLink = sanitizeExternalUrl(r.linkUrl);
+          return (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">URL</span>
+              {safeLink ? (
+                <a
+                  href={safeLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline text-xs truncate max-w-[140px]"
+                >
+                  {safeLink}
+                </a>
+              ) : (
+                <span
+                  className="text-muted-foreground text-xs truncate max-w-[140px]"
+                  title="Unsafe URL scheme — not rendered as a link"
+                >
+                  (unsafe link hidden)
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {!isBitmapOnly && (
           <div className="flex items-center gap-3 flex-wrap">

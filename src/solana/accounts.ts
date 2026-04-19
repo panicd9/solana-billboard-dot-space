@@ -325,14 +325,31 @@ export async function fetchRegionsViaDAS(
 
 // ---- IPFS helper ----
 
+// Returns "" for anything that isn't an ipfs:// URI or a known-safe https gateway.
+// On-chain image_uri is attacker-controlled (any region owner), so raw http(s)
+// passthrough would allow arbitrary tracking pixels, data: URIs, etc.
 export function ipfsToGateway(uri: string): string {
   if (!uri) return "";
-  if (uri.startsWith("ipfs://")) {
-    const cid = uri.slice(7);
-    if (config.pinataGateway) {
-      return `https://${config.pinataGateway}/ipfs/${cid}`;
-    }
-    return `https://ipfs.io/ipfs/${cid}`;
+  const trimmed = uri.trim();
+
+  if (trimmed.startsWith("ipfs://")) {
+    const cid = trimmed.slice(7);
+    if (!/^[A-Za-z0-9./_-]+$/.test(cid)) return "";
+    const gateway = config.pinataGateway || "ipfs.io";
+    return `https://${gateway}/ipfs/${cid}`;
   }
-  return uri;
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:") return "";
+    if (config.pinataGateway && url.hostname === config.pinataGateway) {
+      return url.toString();
+    }
+    if (url.hostname === "ipfs.io" || url.hostname.endsWith(".ipfs.io")) {
+      return url.toString();
+    }
+    return "";
+  } catch {
+    return "";
+  }
 }
