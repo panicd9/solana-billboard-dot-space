@@ -34,6 +34,7 @@ This app talks to a deployed Anchor/Solana program (program ID in [src/config/en
 - [src/solana/transactions.ts](src/solana/transactions.ts) — instruction builders.
 - [src/solana/activityEvents.ts](src/solana/activityEvents.ts) — parses program logs into activity feed events.
 - [src/solana/ipfs.ts](src/solana/ipfs.ts) — Pinata upload.
+- [src/lib/urls.ts](src/lib/urls.ts) — allow-list sanitizers for external links and image URLs; any on-chain-sourced URL rendered in the UI must go through these.
 
 ### Core Data Flow
 
@@ -90,3 +91,4 @@ UI primitives in [src/components/ui/](src/components/ui/) are shadcn/ui — do n
 - `global: "globalThis"` is defined in [vite.config.ts](vite.config.ts) for Buffer polyfill compatibility.
 - Grid dimensions and pricing constants must stay in sync with the Rust program's `constants.rs`.
 - Treat lamport amounts as `bigint` end-to-end; only convert to `number` at the display boundary via `formatSol`.
+- `executePurchase` takes a buyer-supplied `max_price` (slippage cap). The client passes the displayed price + 100 bps buffer; the on-chain handler rejects with `SlippageExceeded` if the fresh Dutch-auction price exceeds it. Preserve this pattern when editing the buy flow.
