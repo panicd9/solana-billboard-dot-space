@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import SolanaProvider from "@/components/SolanaProvider";
 import { RegionProvider } from "@/context/RegionContext";
+import ComingSoon from "./pages/ComingSoon";
 import Index from "./pages/Index";
 import Preview from "./pages/Preview";
 import PreviewCard from "./pages/PreviewCard";
@@ -27,7 +28,8 @@ const App = () => (
         <BrowserRouter>
           <RegionProvider>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<ComingSoon />} />
+              <Route path="/app" element={<Index />} />
               <Route path="/preview" element={<Preview />} />
               <Route path="/preview-card" element={<PreviewCard />} />
               <Route path="/u/:wallet" element={<Profile />} />
