@@ -107,8 +107,15 @@ const decodeGif = async (url: string): Promise<AnimatedImage | null> => {
 /**
  * Load animated GIF frames for regions whose imageUrl points to an animated GIF.
  * Non-GIF and single-frame images are ignored (canvas falls back to static path).
+ *
+ * `hiddenIds` are region asset IDs that moderation has flagged — we must not
+ * fetch or decode their GIFs, otherwise the frontend still pulls disallowed
+ * content from Pinata even though the UI renders a placeholder.
  */
-export const useAnimatedImages = (regions: Region[]): Map<string, AnimatedImage> => {
+export const useAnimatedImages = (
+  regions: Region[],
+  hiddenIds: Set<string>
+): Map<string, AnimatedImage> => {
   const [animated, setAnimated] = useState<Map<string, AnimatedImage>>(new Map());
   // Persist across renders: region IDs whose decode has started. Prevents
   // duplicate fetches if `regions` reference changes before decode completes.
@@ -119,6 +126,7 @@ export const useAnimatedImages = (regions: Region[]): Map<string, AnimatedImage>
 
     for (const region of regions) {
       if (!region.imageUrl) continue;
+      if (hiddenIds.has(region.id)) continue;
       if (animated.has(region.id)) continue;
       if (inflightRef.current.has(region.id)) continue;
       // Heuristic filter: only try GIF decode when URL hints at a GIF. Avoids
@@ -149,7 +157,7 @@ export const useAnimatedImages = (regions: Region[]): Map<string, AnimatedImage>
     return () => {
       cancelled = true;
     };
-  }, [regions, animated]);
+  }, [regions, animated, hiddenIds]);
 
   return animated;
 };

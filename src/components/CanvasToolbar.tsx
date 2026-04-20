@@ -1,10 +1,13 @@
-import { Grid, Tag, Activity as ActivityIcon } from "lucide-react";
+import { Grid, Tag, Activity as ActivityIcon, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
 import logo from "@/assets/logo.png";
 import { useRegions } from "@/context/RegionContext";
+
+const TAKEDOWN_URL =
+  (import.meta.env.VITE_TAKEDOWN_URL as string | undefined)?.trim() || "";
 
 interface Props {
   view: "canvas" | "marketplace";
@@ -87,6 +90,35 @@ const CanvasToolbar = ({ view, onViewChange }: Props) => {
             <span className="hidden sm:inline">Activity</span>
           </Link>
         </Button>
+
+        <Button
+          asChild
+          size="sm"
+          variant="ghost"
+          className="cursor-pointer gap-1.5 text-xs h-7 px-2.5 text-muted-foreground hover:text-foreground hidden md:inline-flex"
+        >
+          <Link to="/policy" aria-label="Content policy">
+            <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Policy</span>
+          </Link>
+        </Button>
+        {TAKEDOWN_URL && (
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            className="cursor-pointer gap-1.5 text-xs h-7 px-2.5 text-muted-foreground hover:text-foreground hidden lg:inline-flex"
+          >
+            <a
+              href={TAKEDOWN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Report a region"
+            >
+              Report
+            </a>
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">

@@ -11,6 +11,7 @@ import { GRID_COLS, GRID_ROWS, isBoostActive, type Region, type Selection } from
 import { useCanvasState } from "@/hooks/useCanvasState";
 import { useOnChainRegions } from "@/hooks/useOnChainRegions";
 import { useAnimatedImages, type AnimatedImage } from "@/hooks/useAnimatedImages";
+import { useModerationList } from "@/hooks/useModerationList";
 import {
   useMintRegion,
   useUpdateRegionImage,
@@ -50,6 +51,7 @@ interface RegionContextType {
   trendingRegions: Region[];
   loadedImages: Map<string, HTMLImageElement>;
   animatedImages: Map<string, AnimatedImage>;
+  isAssetHidden: (assetId: string) => boolean;
   isLoading: boolean;
   error: Error | null;
 }
@@ -85,14 +87,18 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
     [canvasState.data?.occupiedBlocks]
   );
 
-  const animatedImages = useAnimatedImages(regions);
+  const moderation = useModerationList();
+  const { hiddenIds, isHidden } = moderation;
 
-  // Preload images for canvas rendering
+  const animatedImages = useAnimatedImages(regions, hiddenIds);
+
+  // Preload images for canvas rendering. Hidden regions are skipped entirely so
+  // the browser never fetches disallowed content from Pinata / IPFS gateways.
   useEffect(() => {
     for (const region of regions) {
       if (!region.imageUrl) continue;
+      if (hiddenIds.has(region.id)) continue;
       const existing = loadedImages.get(region.id);
-      // Load if missing or if the URL changed (image was updated)
       if (existing && existing.src === region.imageUrl) continue;
       const img = new Image();
       img.onload = () => {
@@ -104,7 +110,21 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
       };
       img.src = region.imageUrl;
     }
-  }, [regions, loadedImages]);
+  }, [regions, loadedImages, hiddenIds]);
+
+  // If a region is hidden after its image was already cached, drop the cached
+  // bitmap so PixelCanvas falls through to the placeholder render path.
+  useEffect(() => {
+    if (hiddenIds.size === 0) return;
+    setLoadedImages((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of hiddenIds) {
+        if (next.delete(id)) changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [hiddenIds]);
 
   // Keep selectedRegion in sync when regions cache updates (optimistic or refetch)
   useEffect(() => {
@@ -339,6 +359,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         trendingRegions,
         loadedImages,
         animatedImages,
+        isAssetHidden: isHidden,
         isLoading,
         error,
       }}

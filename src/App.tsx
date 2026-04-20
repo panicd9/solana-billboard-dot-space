@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 import Embed from "./pages/Embed";
 import Activity from "./pages/Activity";
+import Policy from "./pages/Policy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/u/:wallet" element={<Profile />} />
               <Route path="/embed/r/:assetId" element={<Embed />} />
               <Route path="/activity" element={<Activity />} />
+              <Route path="/policy" element={<Policy />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </RegionProvider>

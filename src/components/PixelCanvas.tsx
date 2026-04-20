@@ -19,7 +19,7 @@ const MAX_ZOOM = 5;
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isLoading } = useRegions();
+  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isAssetHidden, isLoading } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ col: number; row: number } | null>(null);
@@ -386,9 +386,44 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         const rw = region.width * BLOCK_SIZE;
         const rh = region.height * BLOCK_SIZE;
 
-        const anim = animatedImages.get(region.id);
-        const img = loadedImages.get(region.id);
-        if (anim) {
+        const hidden = isAssetHidden(region.id);
+        const anim = hidden ? undefined : animatedImages.get(region.id);
+        const img = hidden ? undefined : loadedImages.get(region.id);
+        if (hidden) {
+          // Neutral gray tile instead of the rendered image. Owner address and
+          // any boosts still render on top (handled below); the region stays
+          // fully interactive so owners/moderators can find it.
+          ctx.fillStyle = "rgba(120, 120, 130, 0.22)";
+          ctx.fillRect(rx, ry, rw, rh);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(rx, ry, rw, rh);
+          ctx.clip();
+          ctx.strokeStyle = "rgba(170, 170, 180, 0.25)";
+          ctx.lineWidth = 1 / zoom;
+          const step = 10;
+          for (let d = -rh; d < rw; d += step) {
+            ctx.beginPath();
+            ctx.moveTo(rx + d, ry);
+            ctx.lineTo(rx + d + rh, ry + rh);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          const label = "HIDDEN";
+          const fontSize = Math.min(14, Math.min(rw, rh) * 0.35);
+          if (fontSize >= 5) {
+            ctx.font = `bold ${fontSize / zoom}px 'Space Grotesk', sans-serif`;
+            const tm = ctx.measureText(label);
+            const lx = rx + rw / 2 - tm.width / 2;
+            const ly = ry + rh / 2 + fontSize / zoom / 3;
+            ctx.fillStyle = "rgba(14, 14, 17, 0.8)";
+            ctx.fillRect(lx - 3 / zoom, ly - fontSize / zoom - 1 / zoom, tm.width + 6 / zoom, fontSize / zoom + 4 / zoom);
+            ctx.fillStyle = "rgba(200, 200, 210, 0.95)";
+            ctx.fillText(label, lx, ly);
+          }
+        } else if (anim) {
           // Pick active frame based on wall-clock time modulo total duration.
           // For reduced-motion, always show the first frame.
           let frameIdx = 0;
@@ -656,7 +691,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
       return () => cancelAnimationFrame(animRef.current);
     }
   }, [
-    regions, occupancy, loadedImages, animatedImages, hoveredBlock, isDragging, dragStart, dragEnd,
+    regions, occupancy, loadedImages, animatedImages, isAssetHidden, hoveredBlock, isDragging, dragStart, dragEnd,
     selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan,
     showPricingOverlay, kbCursor, kbAnchor, hasAnimatedBoost, hasAnimatedGif, reducedMotion,
   ]);

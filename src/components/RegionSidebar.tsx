@@ -12,6 +12,7 @@ import {
   Info,
   User,
   Code2,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,9 @@ import {
 import { sanitizeExternalUrl } from "@/lib/urls";
 import { useWalletConnection } from "@solana/react-hooks";
 
+const TAKEDOWN_URL =
+  (import.meta.env.VITE_TAKEDOWN_URL as string | undefined)?.trim() || "";
+
 const RegionSidebar = () => {
   const {
     selectedRegion,
@@ -55,6 +59,7 @@ const RegionSidebar = () => {
     setRegionImage,
     setRegionLink,
     buyBoost,
+    isAssetHidden,
   } = useRegions();
   const { wallet } = useWalletConnection();
   const nowSec = useNowSeconds(1000);
@@ -80,6 +85,7 @@ const RegionSidebar = () => {
 
   const r = selectedRegion;
   const isBitmapOnly = r.id.startsWith("bitmap-");
+  const hidden = !isBitmapOnly && isAssetHidden(r.id);
   const shortOwner = r.owner ? `${r.owner.slice(0, 4)}...${r.owner.slice(-4)}` : "Unknown";
   const totalBlocks = r.width * r.height;
   const walletAddr = wallet?.account?.address;
@@ -182,14 +188,43 @@ const RegionSidebar = () => {
         </button>
       </div>
 
-      {r.imageUrl && (
+      {hidden ? (
         <div className="p-4 border-b border-border">
-          <img
-            src={r.imageUrl}
-            alt="Region"
-            className="w-full rounded border border-border object-contain"
-          />
+          <div className="w-full aspect-video rounded border border-border bg-muted/40 flex flex-col items-center justify-center gap-2 px-4 text-center">
+            <ShieldAlert className="w-6 h-6 text-muted-foreground" aria-hidden="true" />
+            <p className="text-xs font-semibold text-foreground">
+              Image hidden pending review
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              This region's image was reported and is not rendered on solanabillboard.space.
+            </p>
+            <div className="flex items-center gap-3 pt-1 text-[11px]">
+              {TAKEDOWN_URL && (
+                <a
+                  href={TAKEDOWN_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Report
+                </a>
+              )}
+              <RouterLink to="/policy" className="text-primary hover:underline">
+                Content policy
+              </RouterLink>
+            </div>
+          </div>
         </div>
+      ) : (
+        r.imageUrl && (
+          <div className="p-4 border-b border-border">
+            <img
+              src={r.imageUrl}
+              alt="Region"
+              className="w-full rounded border border-border object-contain"
+            />
+          </div>
+        )
       )}
 
       {BOOST_META_LIST.some((m) => isBoostActive(m.getAt(r), nowSec)) && (

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
 import RegionMiniMap from "@/components/RegionMiniMap";
+import SiteFooter from "@/components/SiteFooter";
 import { BoostDot } from "@/components/BoostDot";
 import { useRegions } from "@/context/RegionContext";
 import { useNowSeconds } from "@/hooks/useNow";
@@ -30,7 +31,7 @@ const avatarGradient = (addr: string): string => {
 const Profile = () => {
   const { wallet: walletParam } = useParams<{ wallet: string }>();
   const navigate = useNavigate();
-  const { regions, isLoading, setSelectedRegion } = useRegions();
+  const { regions, isLoading, setSelectedRegion, isAssetHidden } = useRegions();
   const { wallet: connectedWallet } = useWalletConnection();
   const connected = connectedWallet?.account?.address;
 
@@ -199,7 +200,13 @@ const Profile = () => {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {owned.map((r) => (
-                      <RegionCard key={r.id} region={r} nowSec={nowSec} onOpen={() => handleOpenRegion(r)} />
+                      <RegionCard
+                        key={r.id}
+                        region={r}
+                        nowSec={nowSec}
+                        hidden={isAssetHidden(r.id)}
+                        onOpen={() => handleOpenRegion(r)}
+                      />
                     ))}
                   </div>
                 )}
@@ -208,6 +215,7 @@ const Profile = () => {
           )}
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 };
@@ -236,9 +244,10 @@ interface RegionCardProps {
   region: Region;
   onOpen: () => void;
   nowSec: number;
+  hidden: boolean;
 }
 
-const RegionCard = ({ region: r, onOpen, nowSec }: RegionCardProps) => {
+const RegionCard = ({ region: r, onOpen, nowSec, hidden }: RegionCardProps) => {
   const currentPrice =
     r.isListed && r.listing
       ? formatSol(
@@ -262,7 +271,9 @@ const RegionCard = ({ region: r, onOpen, nowSec }: RegionCardProps) => {
       aria-label={`Region at ${r.startX},${r.startY}, ${r.width} by ${r.height}`}
     >
       <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden relative">
-        {r.imageUrl ? (
+        {hidden ? (
+          <div className="text-muted-foreground text-xs font-mono uppercase tracking-wider">Hidden</div>
+        ) : r.imageUrl ? (
           <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
         ) : (
           <div className="text-muted-foreground text-xs font-mono">No image</div>

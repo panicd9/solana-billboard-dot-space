@@ -12,7 +12,7 @@ import logo from "@/assets/logo.png";
 
 const Embed = () => {
   const { assetId } = useParams<{ assetId: string }>();
-  const { regions, isLoading } = useRegions();
+  const { regions, isLoading, isAssetHidden } = useRegions();
   const nowSec = useNowSeconds(30_000);
 
   const region = useMemo(
@@ -71,7 +71,11 @@ const Embed = () => {
           className="flex-1 flex flex-col bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 transition-colors group"
         >
           <div className="flex-1 bg-secondary flex items-center justify-center overflow-hidden relative min-h-0">
-            {region.imageUrl ? (
+            {isAssetHidden(region.id) ? (
+              <div className="text-muted-foreground text-xs font-mono uppercase tracking-wider">
+                Hidden
+              </div>
+            ) : region.imageUrl ? (
               <img
                 src={region.imageUrl}
                 alt=""

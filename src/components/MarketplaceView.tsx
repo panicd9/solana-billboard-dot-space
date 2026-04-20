@@ -22,7 +22,7 @@ type SortKey = "price" | "size" | "recent";
 type FilterKey = "all" | "listed" | "unlisted" | "boosted";
 
 const MarketplaceView = ({ onHighlightRegion }: Props) => {
-  const { regions, setSelectedRegion, isLoading } = useRegions();
+  const { regions, setSelectedRegion, isLoading, isAssetHidden } = useRegions();
   const nowSec = useNowSeconds(30_000);
   const [sortBy, setSortBy] = useState<SortKey>("recent");
   const [filterBy, setFilterBy] = useState<FilterKey>("all");
@@ -172,7 +172,11 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                   aria-label={`Region at ${r.startX},${r.startY}, ${r.width} by ${r.height}, ${currentPrice ? `listed at ${currentPrice} SOL` : "not listed"}`}
                 >
                   <div className="h-28 bg-secondary flex items-center justify-center overflow-hidden relative">
-                    {r.imageUrl ? (
+                    {isAssetHidden(r.id) ? (
+                      <div className="text-muted-foreground text-xs font-mono uppercase tracking-wider">
+                        Hidden
+                      </div>
+                    ) : r.imageUrl ? (
                       <img src={r.imageUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-muted-foreground text-xs font-mono">No image</div>

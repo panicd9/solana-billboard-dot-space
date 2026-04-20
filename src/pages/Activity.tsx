@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
 import ActivityRow from "@/components/ActivityRow";
+import SiteFooter from "@/components/SiteFooter";
 import logo from "@/assets/logo.png";
 import { useActivityEvents } from "@/hooks/useActivityEvents";
 import { useRegions } from "@/context/RegionContext";
@@ -158,6 +159,7 @@ const Activity = () => {
           )}
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 };
