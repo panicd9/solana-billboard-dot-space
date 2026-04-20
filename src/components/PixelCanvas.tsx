@@ -34,6 +34,26 @@ function coverSourceRect(
   return [0, (srcH - sh) / 2, srcW, sh];
 }
 
+// Letterboxed dest rect that preserves aspect ratio ("object-fit: contain").
+function containDestRect(
+  srcW: number,
+  srcH: number,
+  dstX: number,
+  dstY: number,
+  dstW: number,
+  dstH: number,
+): [number, number, number, number] {
+  if (!srcW || !srcH) return [dstX, dstY, dstW, dstH];
+  const srcAR = srcW / srcH;
+  const dstAR = dstW / dstH;
+  if (srcAR > dstAR) {
+    const h = dstW / srcAR;
+    return [dstX, dstY + (dstH - h) / 2, dstW, h];
+  }
+  const w = dstH * srcAR;
+  return [dstX + (dstW - w) / 2, dstY, w, dstH];
+}
+
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -456,15 +476,21 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           if (imageFit === "cover") {
             const [sx, sy, sw, sh] = coverSourceRect(frame.width, frame.height, rw, rh);
             ctx.drawImage(frame, sx, sy, sw, sh, rx, ry, rw, rh);
+          } else if (imageFit === "contain") {
+            const [dx, dy, dw, dh] = containDestRect(frame.width, frame.height, rx, ry, rw, rh);
+            ctx.drawImage(frame, dx, dy, dw, dh);
           } else {
             ctx.drawImage(frame, rx, ry, rw, rh);
           }
         } else if (img) {
+          const nw = img.naturalWidth || img.width;
+          const nh = img.naturalHeight || img.height;
           if (imageFit === "cover") {
-            const nw = img.naturalWidth || img.width;
-            const nh = img.naturalHeight || img.height;
             const [sx, sy, sw, sh] = coverSourceRect(nw, nh, rw, rh);
             ctx.drawImage(img, sx, sy, sw, sh, rx, ry, rw, rh);
+          } else if (imageFit === "contain") {
+            const [dx, dy, dw, dh] = containDestRect(nw, nh, rx, ry, rw, rh);
+            ctx.drawImage(img, dx, dy, dw, dh);
           } else {
             ctx.drawImage(img, rx, ry, rw, rh);
           }

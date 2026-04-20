@@ -52,7 +52,7 @@ export interface RegionContextType {
   loadedImages: Map<string, HTMLImageElement>;
   animatedImages: Map<string, AnimatedImage>;
   isAssetHidden: (assetId: string) => boolean;
-  imageFit: "fill" | "cover";
+  imageFit: "fill" | "cover" | "contain";
   isLoading: boolean;
   error: Error | null;
 }

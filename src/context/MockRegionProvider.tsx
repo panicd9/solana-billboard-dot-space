@@ -171,7 +171,7 @@ export const MockRegionProvider = ({ children }: { children: ReactNode }) => {
     loadedImages,
     animatedImages,
     isAssetHidden,
-    imageFit: "cover",
+    imageFit: "contain",
     isLoading: false,
     error: null,
   };
