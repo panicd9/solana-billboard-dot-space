@@ -48,7 +48,11 @@ import { generateShareImage } from "@/lib/shareImage";
 import { uploadToIpfs } from "@/solana/ipfs";
 import { useWalletConnection } from "@solana/react-hooks";
 
-const SHARE_BASE_URL = "https://solanabillboard.space";
+// Use the current origin so preview deploys tweet URLs that resolve back to
+// the same preview — which also means the preview's /api/share handles the
+// bounce, making end-to-end card rendering testable per branch.
+const SHARE_BASE_URL =
+  typeof window !== "undefined" ? window.location.origin : "https://solanabillboard.space";
 
 const TAKEDOWN_URL =
   (import.meta.env.VITE_TAKEDOWN_URL as string | undefined)?.trim() || "";
