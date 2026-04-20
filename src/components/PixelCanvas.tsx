@@ -477,6 +477,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
             const [sx, sy, sw, sh] = coverSourceRect(frame.width, frame.height, rw, rh);
             ctx.drawImage(frame, sx, sy, sw, sh, rx, ry, rw, rh);
           } else if (imageFit === "contain") {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(rx, ry, rw, rh);
             const [dx, dy, dw, dh] = containDestRect(frame.width, frame.height, rx, ry, rw, rh);
             ctx.drawImage(frame, dx, dy, dw, dh);
           } else {
@@ -489,6 +491,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
             const [sx, sy, sw, sh] = coverSourceRect(nw, nh, rw, rh);
             ctx.drawImage(img, sx, sy, sw, sh, rx, ry, rw, rh);
           } else if (imageFit === "contain") {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(rx, ry, rw, rh);
             const [dx, dy, dw, dh] = containDestRect(nw, nh, rx, ry, rw, rh);
             ctx.drawImage(img, dx, dy, dw, dh);
           } else {
