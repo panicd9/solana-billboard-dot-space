@@ -101,6 +101,10 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
       const existing = loadedImages.get(region.id);
       if (existing && existing.src === region.imageUrl) continue;
       const img = new Image();
+      // crossOrigin must be set before .src so the browser sends the CORS
+      // request. Without it the canvas becomes tainted and toBlob() fails,
+      // which breaks share-image generation.
+      img.crossOrigin = "anonymous";
       img.onload = () => {
         setLoadedImages((prev) => {
           const next = new Map(prev);

@@ -82,6 +82,7 @@ export const MockRegionProvider = ({ children }: { children: ReactNode }) => {
     for (const r of regions) {
       if (!r.imageUrl) continue;
       const img = new Image();
+      img.crossOrigin = "anonymous";
       img.onload = () => {
         setLoadedImages((prev) => {
           const next = new Map(prev);

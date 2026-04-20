@@ -8,6 +8,7 @@ import SolanaProvider from "@/components/SolanaProvider";
 import { RegionProvider } from "@/context/RegionContext";
 import Index from "./pages/Index";
 import Preview from "./pages/Preview";
+import PreviewCard from "./pages/PreviewCard";
 import Profile from "./pages/Profile";
 import Embed from "./pages/Embed";
 import Activity from "./pages/Activity";
@@ -28,6 +29,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/preview" element={<Preview />} />
+              <Route path="/preview-card" element={<PreviewCard />} />
               <Route path="/u/:wallet" element={<Profile />} />
               <Route path="/embed/r/:assetId" element={<Embed />} />
               <Route path="/activity" element={<Activity />} />

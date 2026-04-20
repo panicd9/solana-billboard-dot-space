@@ -45,6 +45,7 @@ import {
 } from "@/solana/pricing";
 import { sanitizeExternalUrl } from "@/lib/urls";
 import { generateShareImage } from "@/lib/shareImage";
+import { uploadToIpfs } from "@/solana/ipfs";
 import { useWalletConnection } from "@solana/react-hooks";
 
 const SHARE_BASE_URL = "https://solanabillboard.space";
@@ -191,49 +192,65 @@ const RegionSidebar = () => {
 
   const handleShare = async () => {
     const text = buildShareText();
-    const url = `${SHARE_BASE_URL}/?region=${r.id}`;
-    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+    const fallbackUrl = `${SHARE_BASE_URL}/?region=${r.id}`;
 
     setBusyAction("share");
     try {
       let blob: Blob | null = null;
       try {
         blob = await generateShareImage(r, regions, loadedImages, animatedImages, isAssetHidden);
-      } catch {
-        // Fall through to text-only share
+      } catch (err) {
+        console.error("[share] generateShareImage failed:", err);
       }
 
-      const file =
-        blob && typeof File !== "undefined"
-          ? new File([blob], `solanabillboard-${r.startX}-${r.startY}.png`, {
-              type: "image/png",
-            })
-          : null;
-
-      if (file && navigator.canShare?.({ files: [file] })) {
+      let shareUrl = fallbackUrl;
+      let usedCardUrl = false;
+      if (blob) {
         try {
-          await navigator.share({ files: [file], text, url });
-          return;
+          const file = new File(
+            [blob],
+            `solanabillboard-${r.startX}-${r.startY}.png`,
+            { type: "image/png" }
+          );
+          const { gatewayUrl } = await uploadToIpfs(file);
+          const params = new URLSearchParams({
+            img: gatewayUrl,
+            x: String(r.startX),
+            y: String(r.startY),
+            w: String(r.width),
+            h: String(r.height),
+          });
+          shareUrl = `${SHARE_BASE_URL}/r/${r.id}?${params.toString()}`;
+          usedCardUrl = true;
         } catch (err) {
-          if ((err as DOMException)?.name === "AbortError") return;
-          // fall through to clipboard + intent
+          console.error("[share] Pinata upload failed:", err);
         }
       }
 
-      let copied = false;
-      if (blob && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          copied = true;
-        } catch {
-          // clipboard may reject silently
+      const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+
+      if (blob && typeof File !== "undefined") {
+        const file = new File(
+          [blob],
+          `solanabillboard-${r.startX}-${r.startY}.png`,
+          { type: "image/png" }
+        );
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], text, url: shareUrl });
+            return;
+          } catch (err) {
+            if ((err as DOMException)?.name === "AbortError") return;
+            // fall through to intent URL
+          }
         }
       }
+
       window.open(intentUrl, "_blank", "noopener,noreferrer");
-      if (copied) {
-        toast.success("Image copied — paste into your tweet");
+      if (usedCardUrl) {
+        toast.success("Tweet drafted — Twitter will render the region preview");
       } else {
-        toast.success("Tweet drafted — add a screenshot if you want");
+        toast.warning("Tweet drafted (no card image — check console for upload error)");
       }
     } finally {
       setBusyAction(null);
@@ -420,20 +437,21 @@ const RegionSidebar = () => {
         {r.linkUrl && (() => {
           const safeLink = sanitizeExternalUrl(r.linkUrl);
           return (
-            <div className="flex justify-between items-center">
+            <div className="space-y-1">
               <span className="text-muted-foreground">URL</span>
               {safeLink ? (
                 <a
                   href={safeLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline text-xs truncate max-w-[140px]"
+                  title={safeLink}
+                  className="block text-primary hover:underline text-xs truncate"
                 >
                   {safeLink}
                 </a>
               ) : (
                 <span
-                  className="text-muted-foreground text-xs truncate max-w-[140px]"
+                  className="block text-muted-foreground text-xs truncate"
                   title="Unsafe URL scheme — not rendered as a link"
                 >
                   (unsafe link hidden)
