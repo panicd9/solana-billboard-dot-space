@@ -339,11 +339,37 @@ const RegionSidebar = () => {
                 <Info className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[220px]">
-              <p className="text-xs">
-                Boosts are paid visibility upgrades — Highlight/Glow 0.01 SOL, Trending 0.02 SOL.
-                Each lasts 24h; active boosts show here with a countdown.
-              </p>
+            <TooltipContent side="top" className="max-w-[240px] p-3">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold tracking-wider uppercase text-foreground">
+                  Boosts
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Paid visibility upgrades. Each lasts 24&nbsp;hours.
+                </p>
+                <ul className="space-y-1 pt-0.5">
+                  {BOOST_META_LIST.map((m) => {
+                    const Icon = m.icon;
+                    return (
+                      <li
+                        key={m.kind}
+                        className="flex items-center justify-between gap-3 text-xs"
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <Icon className={`w-3 h-3 ${m.iconClass}`} aria-hidden="true" />
+                          <span className="text-foreground">{m.label}</span>
+                        </span>
+                        <span className="font-mono text-muted-foreground">
+                          {m.priceSol} SOL
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-[11px] text-muted-foreground pt-1.5 border-t border-border/60">
+                  Active boosts display here with a live countdown.
+                </p>
+              </div>
             </TooltipContent>
           </Tooltip>
         </div>
