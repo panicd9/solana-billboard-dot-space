@@ -13,6 +13,7 @@ import {
   User,
   Code2,
   ShieldAlert,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +44,10 @@ import {
   parseSolInputToLamports,
 } from "@/solana/pricing";
 import { sanitizeExternalUrl } from "@/lib/urls";
+import { generateShareImage } from "@/lib/shareImage";
 import { useWalletConnection } from "@solana/react-hooks";
+
+const SHARE_BASE_URL = "https://solanabillboard.space";
 
 const TAKEDOWN_URL =
   (import.meta.env.VITE_TAKEDOWN_URL as string | undefined)?.trim() || "";
@@ -59,6 +63,9 @@ const RegionSidebar = () => {
     setRegionLink,
     buyBoost,
     isAssetHidden,
+    regions,
+    loadedImages,
+    animatedImages,
   } = useRegions();
   const { wallet } = useWalletConnection();
   const nowSec = useNowSeconds(1000);
@@ -170,6 +177,69 @@ const RegionSidebar = () => {
     withBusy(`boost-${flags}`, () => buyBoost(r.id, flags));
   };
 
+  const buildShareText = () => {
+    const coords = `(${r.startX},${r.startY})`;
+    const blocks = totalBlocks;
+    if (isOwner && r.isListed) {
+      return `Listing my region on @solanabillboard — Dutch auction, price drops every block until someone takes it\n\n${blocks} pixels at ${coords}`;
+    }
+    if (isOwner) {
+      return `I planted a flag on @solanabillboard 🪩\n\n${blocks} pixels at ${coords} — pick yours before they fill`;
+    }
+    return `This region on @solanabillboard 🪩\n\n${blocks} pixels at ${coords}`;
+  };
+
+  const handleShare = async () => {
+    const text = buildShareText();
+    const url = `${SHARE_BASE_URL}/?region=${r.id}`;
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
+
+    setBusyAction("share");
+    try {
+      let blob: Blob | null = null;
+      try {
+        blob = await generateShareImage(r, regions, loadedImages, animatedImages, isAssetHidden);
+      } catch {
+        // Fall through to text-only share
+      }
+
+      const file =
+        blob && typeof File !== "undefined"
+          ? new File([blob], `solanabillboard-${r.startX}-${r.startY}.png`, {
+              type: "image/png",
+            })
+          : null;
+
+      if (file && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], text, url });
+          return;
+        } catch (err) {
+          if ((err as DOMException)?.name === "AbortError") return;
+          // fall through to clipboard + intent
+        }
+      }
+
+      let copied = false;
+      if (blob && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          copied = true;
+        } catch {
+          // clipboard may reject silently
+        }
+      }
+      window.open(intentUrl, "_blank", "noopener,noreferrer");
+      if (copied) {
+        toast.success("Image copied — paste into your tweet");
+      } else {
+        toast.success("Tweet drafted — add a screenshot if you want");
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   return (
     <aside
       aria-label="Region details panel"
@@ -224,6 +294,24 @@ const RegionSidebar = () => {
             />
           </div>
         )
+      )}
+
+      {!isBitmapOnly && !hidden && (
+        <div className="px-4 pt-3">
+          <Button
+            size="sm"
+            className="w-full gap-2"
+            onClick={handleShare}
+            disabled={busyAction === "share"}
+          >
+            {busyAction === "share" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Share2 className="w-4 h-4" />
+            )}
+            Share
+          </Button>
+        </div>
       )}
 
       {BOOST_META_LIST.some((m) => isBoostActive(m.getAt(r), nowSec)) && (
