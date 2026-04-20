@@ -340,7 +340,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.strokeRect(czX, czY, czW, czH);
         ctx.setLineDash([]);
 
-        const label = "Center Zone — 0.0004 SOL/block";
+        const label = "Center Zone — 0.0005 SOL/block";
         const fontSize = 18 / zoom;
         ctx.font = `bold ${fontSize}px 'Space Grotesk', sans-serif`;
         const tm = ctx.measureText(label);
@@ -351,7 +351,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.fillStyle = "rgba(255, 200, 55, 0.95)";
         ctx.fillText(label, lx, ly);
 
-        const outerLabel = "Outer Zone — bonding curve 0.00004–0.0004 SOL";
+        const outerLabel = "Outer Zone — bonding curve 0.00004–0.0005 SOL";
         const outerFontSize = 16 / zoom;
         ctx.font = `bold ${outerFontSize}px 'Space Grotesk', sans-serif`;
         const otm = ctx.measureText(outerLabel);

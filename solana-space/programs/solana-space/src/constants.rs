@@ -19,10 +19,10 @@ pub const CENTER_ZONE_Y: u16 = (GRID_HEIGHT - CENTER_ZONE_HEIGHT) / 2; // 37
 pub const CENTER_ZONE_BLOCKS: u64 =
     (CENTER_ZONE_WIDTH as u64) * (CENTER_ZONE_HEIGHT as u64); // 2040
 
-pub const CENTER_PRICE_PER_BLOCK: u64 = 400_000;
+pub const CENTER_PRICE_PER_BLOCK: u64 = 500_000;
 
 pub const CURVE_START_PRICE: u64 = 40_000;
-pub const CURVE_END_PRICE: u64 = 400_000;
+pub const CURVE_END_PRICE: u64 = 500_000;
 
 // Total blocks on the bonding curve (everything outside center zone)
 pub const CURVE_TOTAL_BLOCKS: u64 =

@@ -114,15 +114,15 @@ npm run test:watch   # Watch mode (vitest)
 
 ## Pricing Model
 
-**Center zone** (60x34 blocks at canvas center): fixed 0.0004 SOL per block.
+**Center zone** (60x34 blocks at canvas center): fixed 0.0005 SOL per block.
 
-**Outer zone** (remaining 18,696 blocks): linear bonding curve from 0.00004 to 0.0004 SOL per block, increasing as more blocks are sold.
+**Outer zone** (remaining 18,696 blocks): linear bonding curve from 0.00004 to 0.0005 SOL per block, increasing as more blocks are sold.
 
 **Boosts**: Highlighted (0.015 SOL), Glowing Border (0.015 SOL), Trending (0.015 SOL).
 
 **Marketplace fee**: 4% on secondary sales.
 
-Full saturation cost: ~5 SOL.
+Full saturation cost: ~6 SOL.
 
 ## On-Chain Program
 

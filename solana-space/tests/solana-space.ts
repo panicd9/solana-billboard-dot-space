@@ -180,7 +180,7 @@ describe("solana-space", () => {
       await mintRegion(ctx, { x: 65, y: 40, width: 2, height: 1 });
       const after = await lamportBalance(ctx.provider.connection, ctx.treasury.publicKey);
       const paid = after - before;
-      // 1 center block = 400_000 lamports; 1 curve block ≥ 40_000 lamports.
+      // 1 center block = 500_000 lamports; 1 curve block ≥ 40_000 lamports.
       expect(paid > CENTER_PRICE_PER_BLOCK).to.equal(true);
       expect(paid < 2n * CENTER_PRICE_PER_BLOCK).to.equal(true);
     });

@@ -19,9 +19,9 @@ export const CENTER_ZONE_Y = (GRID_HEIGHT - CENTER_ZONE_HEIGHT) / 2;
 export const LAMPORTS_PER_SOL = 1_000_000_000n;
 export const SOL_DECIMALS = 9;
 
-export const CENTER_PRICE_PER_BLOCK = 400_000n;
+export const CENTER_PRICE_PER_BLOCK = 500_000n;
 export const CURVE_START_PRICE = 40_000n;
-export const CURVE_END_PRICE = 400_000n;
+export const CURVE_END_PRICE = 500_000n;
 export const CURVE_TOTAL_BLOCKS = BigInt(
   TOTAL_BLOCKS - CENTER_ZONE_WIDTH * CENTER_ZONE_HEIGHT
 );
