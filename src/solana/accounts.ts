@@ -348,6 +348,7 @@ export function ipfsToGateway(uri: string): string {
     if (url.hostname === "ipfs.io" || url.hostname.endsWith(".ipfs.io")) {
       return url.toString();
     }
+    if (config.network === "localnet") return url.toString();
     return "";
   } catch {
     return "";
