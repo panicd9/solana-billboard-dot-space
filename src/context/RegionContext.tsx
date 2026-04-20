@@ -24,7 +24,7 @@ import {
 import { calculateRegionPrice, formatSol } from "@/solana/pricing";
 import { ipfsToGateway } from "@/solana/accounts";
 
-interface RegionContextType {
+export interface RegionContextType {
   regions: Region[];
   occupancy: Set<string>; // "x:y"
   selectedRegion: Region | null;
@@ -56,7 +56,7 @@ interface RegionContextType {
   error: Error | null;
 }
 
-const RegionContext = createContext<RegionContextType | null>(null);
+export const RegionContext = createContext<RegionContextType | null>(null);
 
 export const useRegions = () => {
   const ctx = useContext(RegionContext);
