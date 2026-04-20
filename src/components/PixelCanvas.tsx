@@ -16,10 +16,28 @@ interface Props {
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
 
+// Center-cropped source rect that preserves aspect ratio ("object-fit: cover").
+function coverSourceRect(
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): [number, number, number, number] {
+  if (!srcW || !srcH) return [0, 0, srcW, srcH];
+  const srcAR = srcW / srcH;
+  const dstAR = dstW / dstH;
+  if (srcAR > dstAR) {
+    const sw = srcH * dstAR;
+    return [(srcW - sw) / 2, 0, sw, srcH];
+  }
+  const sh = srcW / dstAR;
+  return [0, (srcH - sh) / 2, srcW, sh];
+}
+
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isAssetHidden, isLoading } = useRegions();
+  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isAssetHidden, imageFit, isLoading } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ col: number; row: number } | null>(null);
@@ -434,9 +452,22 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
               t -= anim.delays[i];
             }
           }
-          ctx.drawImage(anim.frames[frameIdx], rx, ry, rw, rh);
+          const frame = anim.frames[frameIdx];
+          if (imageFit === "cover") {
+            const [sx, sy, sw, sh] = coverSourceRect(frame.width, frame.height, rw, rh);
+            ctx.drawImage(frame, sx, sy, sw, sh, rx, ry, rw, rh);
+          } else {
+            ctx.drawImage(frame, rx, ry, rw, rh);
+          }
         } else if (img) {
-          ctx.drawImage(img, rx, ry, rw, rh);
+          if (imageFit === "cover") {
+            const nw = img.naturalWidth || img.width;
+            const nh = img.naturalHeight || img.height;
+            const [sx, sy, sw, sh] = coverSourceRect(nw, nh, rw, rh);
+            ctx.drawImage(img, sx, sy, sw, sh, rx, ry, rw, rh);
+          } else {
+            ctx.drawImage(img, rx, ry, rw, rh);
+          }
         } else {
           ctx.fillStyle = "rgba(100, 70, 180, 0.25)";
           ctx.fillRect(rx, ry, rw, rh);

@@ -52,6 +52,7 @@ export interface RegionContextType {
   loadedImages: Map<string, HTMLImageElement>;
   animatedImages: Map<string, AnimatedImage>;
   isAssetHidden: (assetId: string) => boolean;
+  imageFit: "fill" | "cover";
   isLoading: boolean;
   error: Error | null;
 }
@@ -364,6 +365,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         loadedImages,
         animatedImages,
         isAssetHidden: isHidden,
+        imageFit: "fill",
         isLoading,
         error,
       }}
