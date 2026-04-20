@@ -41,7 +41,6 @@ export const CANVAS_W = GRID_COLS * BLOCK_SIZE;
 export const CANVAS_H = GRID_ROWS * BLOCK_SIZE;
 
 // Boost economics — must match Rust constants.rs.
-export const BOOST_COST_SOL = 0.015;
 export const BOOST_DURATION_SECONDS = 86_400;
 
 export function isBoostActive(at: bigint, nowSec: number): boolean {

@@ -43,7 +43,9 @@ pub const BOOST_HIGHLIGHTED: u8 = 1 << 0; // bit 0 = 1
 pub const BOOST_GLOWING: u8 = 1 << 1; // bit 1 = 2
 pub const BOOST_TRENDING: u8 = 1 << 2; // bit 2 = 4
 
-pub const BOOST_PRICE: u64 = 15_000_000;
+pub const BOOST_HIGHLIGHTED_PRICE: u64 = 10_000_000;
+pub const BOOST_GLOWING_PRICE: u64 = 10_000_000;
+pub const BOOST_TRENDING_PRICE: u64 = 20_000_000;
 
 pub const BOOST_DURATION_SECONDS: i64 = 86_400; // 24h
 

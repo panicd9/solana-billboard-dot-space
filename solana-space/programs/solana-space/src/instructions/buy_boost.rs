@@ -50,7 +50,17 @@ pub struct BuyBoost<'info> {
 const ALL_BOOSTS: u8 = BOOST_HIGHLIGHTED | BOOST_GLOWING | BOOST_TRENDING;
 
 fn total_boost_price(flags: u8) -> u64 {
-    u64::from(flags.count_ones()) * BOOST_PRICE
+    let mut total: u64 = 0;
+    if flags & BOOST_HIGHLIGHTED != 0 {
+        total += BOOST_HIGHLIGHTED_PRICE;
+    }
+    if flags & BOOST_GLOWING != 0 {
+        total += BOOST_GLOWING_PRICE;
+    }
+    if flags & BOOST_TRENDING != 0 {
+        total += BOOST_TRENDING_PRICE;
+    }
+    total
 }
 
 pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<()> {

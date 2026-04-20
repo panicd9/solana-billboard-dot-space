@@ -51,7 +51,7 @@ All region state is read from on-chain accounts via TanStack Query and exposed t
 - **Center zone**: 60×34 block region centered at (66, 37). Flat price **0.0005 SOL/block** (1.02 SOL for the full zone).
 - **Curve zone**: remaining 18,696 blocks follow a linear bonding curve from **0.00004 → 0.0005 SOL/block** as `curveBlocksSold` increases (~5.05 SOL fully saturated).
 - Full billboard saturates at ~6.07 SOL. Prices are in SOL lamports (9 decimals). Use `formatSol()` for display.
-- **Boosts**: HIGHLIGHTED, GLOWING, TRENDING — flat **0.015 SOL** each, each stored as a Unix-second `i64` purchase time on the `Boosts` PDA. Active iff `now - at < 86_400` (24h window). Re-buying while active shifts the timestamp forward by one duration (stackable extend). Purchase flags are bitflags (a single tx can activate/extend multiple at once). See [src/lib/boosts.ts](src/lib/boosts.ts) for the shared `BOOST_META` table driving all boost UI.
+- **Boosts**: HIGHLIGHTED (**0.01 SOL**), GLOWING (**0.01 SOL**), TRENDING (**0.02 SOL**); each stored as a Unix-second `i64` purchase time on the `Boosts` PDA. Active iff `now - at < 86_400` (24h window). Re-buying while active shifts the timestamp forward by one duration (stackable extend). Purchase flags are bitflags (a single tx can activate/extend multiple at once); total charge sums per-flag prices. See [src/lib/boosts.ts](src/lib/boosts.ts) for the shared `BOOST_META` table driving all boost UI.
 - **Marketplace fee**: 4% (400 bps), paid in SOL to the treasury wallet.
 
 ### Routes ([src/App.tsx](src/App.tsx))

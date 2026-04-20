@@ -30,7 +30,6 @@ import {
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
 import {
-  BOOST_COST_SOL,
   isBoostActive,
   boostSecondsRemaining,
   formatBoostCountdown,
@@ -254,7 +253,7 @@ const RegionSidebar = () => {
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-[220px]">
               <p className="text-xs">
-                Boosts are paid visibility upgrades the owner can buy for {BOOST_COST_SOL} SOL each.
+                Boosts are paid visibility upgrades — Highlight/Glow 0.01 SOL, Trending 0.02 SOL.
                 Each lasts 24h; active boosts show here with a countdown.
               </p>
             </TooltipContent>
@@ -444,8 +443,8 @@ const RegionSidebar = () => {
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[220px]">
                 <p className="text-xs">
-                  Each boost costs {BOOST_COST_SOL} SOL and lasts 24h. Re-buying while active
-                  extends by another 24h. Paid to the treasury.
+                  Boosts last 24h each. Re-buying while active extends by another 24h. Paid
+                  to the treasury.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -478,7 +477,7 @@ const RegionSidebar = () => {
                       ? `Extend ${m.label} 24h`
                       : `${m.label} 24h`}
                   </span>
-                  <span className="text-muted-foreground">{BOOST_COST_SOL} SOL</span>
+                  <span className="text-muted-foreground">{m.priceSol} SOL</span>
                 </Button>
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground pl-1">
                   <span className="truncate pr-2">

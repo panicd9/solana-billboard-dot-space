@@ -21,7 +21,9 @@ export const BPS_DENOM = 10_000n;
 export const CURVE_START_PRICE = 40_000n;
 export const CURVE_END_PRICE = 500_000n;
 export const CENTER_PRICE_PER_BLOCK = 500_000n;
-export const BOOST_PRICE = 15_000_000n;
+export const BOOST_HIGHLIGHTED_PRICE = 10_000_000n;
+export const BOOST_GLOWING_PRICE = 10_000_000n;
+export const BOOST_TRENDING_PRICE = 20_000_000n;
 export const MAX_URI_LENGTH = 200;
 export const MAX_LINK_LENGTH = 200;
 

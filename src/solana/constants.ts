@@ -30,6 +30,8 @@ export const BOOST_HIGHLIGHTED = 1;
 export const BOOST_GLOWING = 2;
 export const BOOST_TRENDING = 4;
 
-export const BOOST_PRICE = 15_000_000n;
+export const BOOST_HIGHLIGHTED_PRICE = 10_000_000n;
+export const BOOST_GLOWING_PRICE = 10_000_000n;
+export const BOOST_TRENDING_PRICE = 20_000_000n;
 
 export const MARKETPLACE_FEE_BPS = 400;

@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { expect } from "chai";
 import { Keypair, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import {
-  BOOST_PRICE,
+  BOOST_HIGHLIGHTED_PRICE,
   BPS_DENOM,
   CENTER_PRICE_PER_BLOCK,
   CURVE_START_PRICE,
@@ -356,7 +356,7 @@ describe("solana-space", () => {
         lamportBalance(ctx.provider.connection, ctx.treasury.publicKey),
         ctx.program.account.boosts.fetch(boosts),
       ]);
-      expect(after - before).to.equal(BOOST_PRICE);
+      expect(after - before).to.equal(BOOST_HIGHLIGHTED_PRICE);
       expect(state.highlightedAt.toNumber()).to.be.closeTo(txTime, 30);
       expect(state.glowingAt.toNumber()).to.equal(0);
       expect(state.trendingAt.toNumber()).to.equal(0);

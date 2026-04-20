@@ -3,6 +3,10 @@ import {
   BOOST_HIGHLIGHTED,
   BOOST_GLOWING,
   BOOST_TRENDING,
+  BOOST_HIGHLIGHTED_PRICE,
+  BOOST_GLOWING_PRICE,
+  BOOST_TRENDING_PRICE,
+  LAMPORTS_PER_SOL,
 } from "@/solana/constants";
 import type { Region } from "@/types/region";
 
@@ -17,12 +21,17 @@ export interface BoostMeta {
   /** Description when prefers-reduced-motion is active. */
   descriptionStatic: string;
   icon: LucideIcon;
+  priceLamports: bigint;
+  priceSol: number;
   // Pre-composed Tailwind class fragments — listed in full so the JIT scanner picks them up.
   badgeClass: string;
   iconClass: string;
   dotClass: string;
   getAt: (r: Region) => bigint;
 }
+
+const lamportsToSol = (lamports: bigint): number =>
+  Number(lamports) / Number(LAMPORTS_PER_SOL);
 
 export const BOOST_META: Record<BoostKind, BoostMeta> = {
   highlight: {
@@ -32,6 +41,8 @@ export const BOOST_META: Record<BoostKind, BoostMeta> = {
     description: "Pulsing cyan inner glow draws the eye on the canvas.",
     descriptionStatic: "Cyan inner glow frames the region on the canvas.",
     icon: Sparkles,
+    priceLamports: BOOST_HIGHLIGHTED_PRICE,
+    priceSol: lamportsToSol(BOOST_HIGHLIGHTED_PRICE),
     badgeClass:
       "bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 shadow-[0_0_8px_rgba(34,211,238,0.35)]",
     iconClass: "text-cyan-400",
@@ -45,6 +56,8 @@ export const BOOST_META: Record<BoostKind, BoostMeta> = {
     description: "Animated purple border snakes around your region.",
     descriptionStatic: "Bright purple border wraps the region.",
     icon: Zap,
+    priceLamports: BOOST_GLOWING_PRICE,
+    priceSol: lamportsToSol(BOOST_GLOWING_PRICE),
     badgeClass:
       "bg-purple-500/15 text-purple-300 border border-purple-400/30 shadow-[0_0_8px_rgba(153,69,255,0.3)]",
     iconClass: "text-purple-400",
@@ -59,6 +72,8 @@ export const BOOST_META: Record<BoostKind, BoostMeta> = {
     description: "Pins to the Trending sidebar with an arrow badge.",
     descriptionStatic: "Pins to the Trending sidebar with an arrow badge.",
     icon: TrendingUp,
+    priceLamports: BOOST_TRENDING_PRICE,
+    priceSol: lamportsToSol(BOOST_TRENDING_PRICE),
     badgeClass:
       "bg-orange-500/15 text-orange-300 border border-orange-400/30 shadow-[0_0_8px_rgba(255,140,0,0.25)]",
     iconClass: "text-orange-400",
