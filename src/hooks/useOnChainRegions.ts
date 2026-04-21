@@ -293,7 +293,7 @@ export function useOnChainRegions() {
         };
       });
     },
-    staleTime: 15_000,
-    refetchInterval: 60_000,
+    staleTime: 60_000,
+    refetchInterval: 180_000,
   });
 }

@@ -50,6 +50,15 @@ function getConfig(): AppConfig {
 
   const wsUrl = (import.meta.env.VITE_WS_URL ?? "").trim() || deriveWsUrl(rpcUrl);
 
+  const useDAS = import.meta.env.VITE_USE_DAS === "true";
+  if (network === "mainnet-beta" && !useDAS) {
+    throw new Error(
+      `Config error: VITE_USE_DAS must be "true" on mainnet-beta. ` +
+      `The getProgramAccounts fallback is too expensive for free-tier RPCs and ` +
+      `will exhaust Helius credits under load.`
+    );
+  }
+
   return {
     network,
     rpcUrl,
@@ -59,7 +68,7 @@ function getConfig(): AppConfig {
     treasury,
     pinataJwt,
     pinataGateway,
-    useDAS: import.meta.env.VITE_USE_DAS === "true",
+    useDAS,
   };
 }
 

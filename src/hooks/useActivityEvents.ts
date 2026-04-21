@@ -47,14 +47,33 @@ async function fetchActivity(): Promise<ActivityEvent[]> {
   const rpc = getRpc();
   const cache = loadCache();
 
-  // With a cursor, ask only for sigs newer than the last one we saw.
-  // Without one, pull the most recent SIGNATURE_LIMIT.
-  const sigs = await rpc
-    .getSignaturesForAddress(SOLANA_SPACE_PROGRAM_ADDRESS, {
-      limit: SIGNATURE_LIMIT,
-      ...(cache.lastSeenSig ? { until: cache.lastSeenSig as Signature } : {}),
-    })
-    .send();
+  // With a cursor, paginate backwards until we reach lastSeenSig so bursts of
+  // more than SIGNATURE_LIMIT tx between polls don't silently drop events.
+  // Without one (initial bootstrap), only pull the most recent SIGNATURE_LIMIT
+  // to avoid walking the entire program history on first load.
+  type SigPage = Awaited<
+    ReturnType<ReturnType<typeof rpc.getSignaturesForAddress>["send"]>
+  >;
+  type SigInfo = SigPage[number];
+  const sigs: SigInfo[] = [];
+  const hasCursor = !!cache.lastSeenSig;
+  let before: Signature | undefined;
+
+  while (true) {
+    const batch = await rpc
+      .getSignaturesForAddress(SOLANA_SPACE_PROGRAM_ADDRESS, {
+        limit: SIGNATURE_LIMIT,
+        ...(cache.lastSeenSig ? { until: cache.lastSeenSig as Signature } : {}),
+        ...(before ? { before } : {}),
+      })
+      .send();
+
+    if (batch.length === 0) break;
+    sigs.push(...batch);
+    if (batch.length < SIGNATURE_LIMIT) break;
+    if (!hasCursor) break;
+    before = batch[batch.length - 1].signature as Signature;
+  }
 
   if (sigs.length === 0) return cache.events;
 

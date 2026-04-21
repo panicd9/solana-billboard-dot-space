@@ -18,7 +18,7 @@ export function useCanvasState() {
         occupiedBlocks: parseBitmap(account.data.bitmap),
       };
     },
-    staleTime: 10_000,
+    staleTime: 15_000,
     refetchInterval: 30_000,
   });
 }
