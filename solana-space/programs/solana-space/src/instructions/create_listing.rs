@@ -52,7 +52,10 @@ pub fn create_listing_handler(ctx: Context<CreateListing>, args: CreateListingAr
     // 1. Validate inputs
     require!(args.start_price > 0, ErrorCode::InvalidStartPrice);
     require!(args.end_price > 0, ErrorCode::InvalidEndPrice);
-    require!(args.duration_seconds > 0, ErrorCode::InvalidDuration);
+    require!(
+        args.duration_seconds > 0 && args.duration_seconds <= i64::MAX as u64,
+        ErrorCode::InvalidDuration
+    );
 
     // 2. Validate collection
     {
@@ -63,14 +66,29 @@ pub fn create_listing_handler(ctx: Context<CreateListing>, args: CreateListingAr
         );
     }
 
-    // 3. Validate seller is the NFT owner (read raw bytes: owner at offset 1..33)
-    let asset_data = ctx.accounts.asset.try_borrow_data()?;
-    require!(asset_data.len() >= 33, ErrorCode::MetaplexCpiFailed);
-    let owner_bytes: [u8; 32] =
-        asset_data[1..33].try_into().map_err(|_| ErrorCode::MetaplexCpiFailed)?;
-    let asset_owner = Pubkey::new_from_array(owner_bytes);
-    drop(asset_data);
-    require!(asset_owner == ctx.accounts.seller.key(), ErrorCode::NotAssetOwner);
+    // 3. Validate seller ownership AND canvas-collection membership by reading raw bytes.
+    //    Metaplex Core BaseAssetV1 layout:
+    //      byte 0:       Key enum discriminant
+    //      bytes 1..33:  owner (Pubkey)
+    //      byte 33:      UpdateAuthority enum discriminant (0=None, 1=Address, 2=Collection)
+    //      bytes 34..66: authority pubkey (collection address when discriminant is 2)
+    {
+        let asset_data = ctx.accounts.asset.try_borrow_data()?;
+        require!(asset_data.len() >= 66, ErrorCode::MetaplexCpiFailed);
+        let owner_bytes: [u8; 32] =
+            asset_data[1..33].try_into().map_err(|_| ErrorCode::MetaplexCpiFailed)?;
+        let asset_owner = Pubkey::new_from_array(owner_bytes);
+        require!(asset_owner == ctx.accounts.seller.key(), ErrorCode::NotAssetOwner);
+
+        require!(asset_data[33] == 2, ErrorCode::InvalidCollection);
+        let collection_bytes: [u8; 32] =
+            asset_data[34..66].try_into().map_err(|_| ErrorCode::MetaplexCpiFailed)?;
+        let asset_collection = Pubkey::new_from_array(collection_bytes);
+        require!(
+            asset_collection == ctx.accounts.collection.key(),
+            ErrorCode::InvalidCollection
+        );
+    }
 
     // 4. Calculate timestamps
     let clock = Clock::get()?;

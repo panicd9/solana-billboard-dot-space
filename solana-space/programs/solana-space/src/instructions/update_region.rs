@@ -66,16 +66,25 @@ pub fn update_region_handler(ctx: Context<UpdateRegion>, args: UpdateRegionArgs)
         canvas_state.bump
     };
 
-    // 2. Validate the signer is the NFT owner
-    // Metaplex Core BaseAssetV1 layout: Key(1 byte) + Owner(32 bytes) at offset 1
-    let asset_data = ctx.accounts.asset.try_borrow_data()?;
-    require!(asset_data.len() >= 33, ErrorCode::MetaplexCpiFailed);
-    let owner_bytes: [u8; 32] =
-        asset_data[1..33].try_into().map_err(|_| ErrorCode::MetaplexCpiFailed)?;
-    let asset_owner = Pubkey::new_from_array(owner_bytes);
-    drop(asset_data);
+    // 2. Validate signer is the NFT owner AND asset belongs to the canvas collection.
+    // Metaplex Core BaseAssetV1 layout: Key(1) + Owner(32) + UpdateAuthority tag(1) + authority(32)
+    {
+        let asset_data = ctx.accounts.asset.try_borrow_data()?;
+        require!(asset_data.len() >= 66, ErrorCode::MetaplexCpiFailed);
+        let owner_bytes: [u8; 32] =
+            asset_data[1..33].try_into().map_err(|_| ErrorCode::MetaplexCpiFailed)?;
+        let asset_owner = Pubkey::new_from_array(owner_bytes);
+        require!(asset_owner == ctx.accounts.owner.key(), ErrorCode::UnauthorizedOwner);
 
-    require!(asset_owner == ctx.accounts.owner.key(), ErrorCode::UnauthorizedOwner);
+        require!(asset_data[33] == 2, ErrorCode::InvalidCollection);
+        let collection_bytes: [u8; 32] =
+            asset_data[34..66].try_into().map_err(|_| ErrorCode::MetaplexCpiFailed)?;
+        let asset_collection = Pubkey::new_from_array(collection_bytes);
+        require!(
+            asset_collection == ctx.accounts.collection.key(),
+            ErrorCode::InvalidCollection
+        );
+    }
 
     // 3. Validate inputs
     require!(args.new_image_uri.len() <= MAX_URI_LENGTH, ErrorCode::UriTooLong);

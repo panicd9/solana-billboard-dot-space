@@ -57,7 +57,8 @@ export function getInitializeDiscriminatorBytes() {
 
 export type InitializeInstruction<
   TProgram extends string = typeof SOLANA_SPACE_PROGRAM_ADDRESS,
-  TAccountAuthority extends string | AccountMeta<string> = string,
+  TAccountAuthority extends string | AccountMeta<string> =
+    "Q7RXkkmH1yVhMGcfCnNXYWtBTJgqsajHLa77XC1GFgG",
   TAccountCanvasState extends string | AccountMeta<string> = string,
   TAccountCollection extends string | AccountMeta<string> = string,
   TAccountMplCoreProgram extends string | AccountMeta<string> =
@@ -140,7 +141,7 @@ export type InitializeAsyncInput<
   TAccountMplCoreProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
+  authority?: TransactionSigner<TAccountAuthority>;
   canvasState?: Address<TAccountCanvasState>;
   /** The collection account (fresh keypair, signer) */
   collection: TransactionSigner<TAccountCollection>;
@@ -196,6 +197,10 @@ export async function getInitializeInstructionAsync<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.authority.value) {
+    accounts.authority.value =
+      "Q7RXkkmH1yVhMGcfCnNXYWtBTJgqsajHLa77XC1GFgG" as Address<"Q7RXkkmH1yVhMGcfCnNXYWtBTJgqsajHLa77XC1GFgG">;
+  }
   if (!accounts.canvasState.value) {
     accounts.canvasState.value = await getProgramDerivedAddress({
       programAddress,
@@ -243,7 +248,7 @@ export type InitializeInput<
   TAccountMplCoreProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
+  authority?: TransactionSigner<TAccountAuthority>;
   canvasState: Address<TAccountCanvasState>;
   /** The collection account (fresh keypair, signer) */
   collection: TransactionSigner<TAccountCollection>;
@@ -297,6 +302,10 @@ export function getInitializeInstruction<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.authority.value) {
+    accounts.authority.value =
+      "Q7RXkkmH1yVhMGcfCnNXYWtBTJgqsajHLa77XC1GFgG" as Address<"Q7RXkkmH1yVhMGcfCnNXYWtBTJgqsajHLa77XC1GFgG">;
+  }
   if (!accounts.mplCoreProgram.value) {
     accounts.mplCoreProgram.value =
       "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d" as Address<"CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d">;

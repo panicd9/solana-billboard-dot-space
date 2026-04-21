@@ -89,6 +89,7 @@ pub fn buy_boost_handler(ctx: Context<BuyBoost>, args: BuyBoostArgs) -> Result<(
     //      byte 33:      UpdateAuthority enum discriminant (0=None, 1=Address, 2=Collection)
     //      bytes 34..66: authority pubkey (collection address when discriminant is 2)
     {
+        require!(ctx.accounts.asset.owner == &mpl_core::ID, ErrorCode::InvalidAsset);
         let asset_data = ctx.accounts.asset.try_borrow_data()?;
         require!(asset_data.len() >= 66, ErrorCode::MetaplexCpiFailed);
         require!(asset_data[33] == 2, ErrorCode::InvalidCollection);

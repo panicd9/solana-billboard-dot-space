@@ -132,8 +132,10 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
     require!(args.height >= 1, ErrorCode::InvalidHeight);
     require!(args.x < GRID_WIDTH, ErrorCode::InvalidXCoordinate);
     require!(args.y < GRID_HEIGHT, ErrorCode::InvalidYCoordinate);
+    let end_x = args.x.checked_add(args.width).ok_or(ErrorCode::RegionOutOfBounds)?;
+    let end_y = args.y.checked_add(args.height).ok_or(ErrorCode::RegionOutOfBounds)?;
     require!(
-        args.x + args.width <= GRID_WIDTH && args.y + args.height <= GRID_HEIGHT,
+        end_x <= GRID_WIDTH && end_y <= GRID_HEIGHT,
         ErrorCode::RegionOutOfBounds
     );
     require!(args.image_uri.len() <= MAX_URI_LENGTH, ErrorCode::UriTooLong);

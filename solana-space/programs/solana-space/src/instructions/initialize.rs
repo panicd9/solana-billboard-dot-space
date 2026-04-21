@@ -3,6 +3,8 @@ use mpl_core::instructions::CreateCollectionV2CpiBuilder;
 use crate::constants::*;
 use crate::state::CanvasState;
 
+pub const DEPLOY_AUTHORITY: Pubkey = pubkey!("Q7RXkkmH1yVhMGcfCnNXYWtBTJgqsajHLa77XC1GFgG");
+
 #[derive(AnchorDeserialize, AnchorSerialize)]
 pub struct InitializeArgs {
     pub treasury: Pubkey,
@@ -11,7 +13,7 @@ pub struct InitializeArgs {
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    #[account(mut)]
+    #[account(mut, address = DEPLOY_AUTHORITY)]
     pub authority: Signer<'info>,
 
     #[account(

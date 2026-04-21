@@ -41,6 +41,9 @@ pub enum ErrorCode {
     #[msg("Invalid collection address")]
     InvalidCollection,
 
+    #[msg("Asset account is not owned by the Metaplex Core program")]
+    InvalidAsset,
+
     // --- Boost errors ---
     #[msg("Invalid boost type")]
     InvalidBoostType,

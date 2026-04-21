@@ -84,11 +84,13 @@ pub fn execute_purchase_handler(
     // 2a. Enforce buyer-supplied slippage cap
     require!(price <= args.max_price, ErrorCode::SlippageExceeded);
 
-    // 3. Calculate marketplace fee and seller proceeds
+    // 3. Calculate marketplace fee (ceiling, in the protocol's favor) and seller proceeds
+    let denom = BPS_DENOMINATOR as u128;
     let fee = (price as u128)
         .checked_mul(MARKETPLACE_FEE_BPS as u128)
+        .and_then(|v| v.checked_add(denom - 1))
         .ok_or(error!(ErrorCode::ArithmeticOverflow))?
-        / (BPS_DENOMINATOR as u128);
+        / denom;
     let fee = fee as u64;
     let seller_amount = price.checked_sub(fee).ok_or(error!(ErrorCode::ArithmeticOverflow))?;
 
