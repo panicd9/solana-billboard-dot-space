@@ -365,7 +365,7 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         loadedImages,
         animatedImages,
         isAssetHidden: isHidden,
-        imageFit: "fill",
+        imageFit: "contain",
         isLoading,
         error,
       }}
