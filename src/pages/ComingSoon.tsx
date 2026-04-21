@@ -17,7 +17,7 @@ const launchDisplay = LAUNCH_AT.toLocaleString("en-US", {
   year: "numeric",
   hour: "numeric",
   minute: "2-digit",
-  timeZone: "Europe/Belgrade",
+  timeZone: "UTC",
   timeZoneName: "short",
 });
 
