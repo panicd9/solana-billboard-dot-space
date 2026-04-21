@@ -13,6 +13,7 @@ const HERO_KEY = "billboard:hero-dismissed";
 
 const Index = () => {
   const [selection, setSelection] = useState<Selection | null>(null);
+  const [previewImage, setPreviewImage] = useState<HTMLImageElement | null>(null);
   const [view, setView] = useState<"canvas" | "marketplace">("canvas");
   const [purchasePanelOpen, setPurchasePanelOpen] = useState(false);
   const [purchasePanelCollapsed, setPurchasePanelCollapsed] = useState(false);
@@ -61,6 +62,7 @@ const Index = () => {
 
   const handleClearSelection = () => {
     setSelection(null);
+    setPreviewImage(null);
     setPurchasePanelOpen(false);
     setPurchasePanelCollapsed(false);
   };
@@ -96,12 +98,15 @@ const Index = () => {
                 showPricingOverlay={showPricingOverlay}
                 heroDismissed={heroDismissed}
                 onDismissHero={handleDismissHero}
+                previewImage={previewImage}
               />
             </div>
             {purchasePanelOpen && !selectedRegion && (
               <PurchasePanel
                 selection={selection}
                 onClearSelection={handleClearSelection}
+                onSelectionChange={setSelection}
+                onPreviewImageChange={setPreviewImage}
                 collapsed={purchasePanelCollapsed}
                 onToggleCollapse={() => setPurchasePanelCollapsed((c) => !c)}
                 showPricingOverlay={showPricingOverlay}

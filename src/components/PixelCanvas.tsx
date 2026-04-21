@@ -11,6 +11,7 @@ interface Props {
   showPricingOverlay?: boolean;
   heroDismissed: boolean;
   onDismissHero: () => void;
+  previewImage?: HTMLImageElement | null;
 }
 
 const MIN_ZOOM = 1;
@@ -54,13 +55,18 @@ function containDestRect(
   return [dstX + (dstW - w) / 2, dstY, w, dstH];
 }
 
-const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero }: Props) => {
+const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero, previewImage }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isAssetHidden, imageFit, isLoading } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ col: number; row: number } | null>(null);
+  const [moveState, setMoveState] = useState<{
+    offsetCol: number;
+    offsetRow: number;
+    preview: Selection;
+  } | null>(null);
   const [hoveredBlock, setHoveredBlock] = useState<{ col: number; row: number } | null>(null);
   const [tooltipInfo, setTooltipInfo] = useState<{ x: number; y: number; text: string } | null>(null);
   const animRef = useRef<number>(0);
@@ -143,12 +149,28 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         return;
       }
 
+      // Inside an already-finalized selection → start a move, not a new drag-select.
+      if (
+        selection &&
+        coords.col >= selection.col &&
+        coords.col < selection.col + selection.width &&
+        coords.row >= selection.row &&
+        coords.row < selection.row + selection.height
+      ) {
+        setMoveState({
+          offsetCol: coords.col - selection.col,
+          offsetRow: coords.row - selection.row,
+          preview: selection,
+        });
+        return;
+      }
+
       setIsDragging(true);
       setDragStart(coords);
       setDragEnd(coords);
       onSelectionChange(null);
     },
-    [getBlockCoords, getRegionAt, onRegionClick, onSelectionChange, pan]
+    [getBlockCoords, getRegionAt, onRegionClick, onSelectionChange, pan, selection]
   );
 
   const handleMouseMove = useCallback(
@@ -163,6 +185,23 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
       const coords = getBlockCoords(e);
       if (!coords) return;
       setHoveredBlock(coords);
+
+      if (moveState && selection) {
+        const newCol = Math.max(
+          0,
+          Math.min(GRID_COLS - selection.width, coords.col - moveState.offsetCol)
+        );
+        const newRow = Math.max(
+          0,
+          Math.min(GRID_ROWS - selection.height, coords.row - moveState.offsetRow)
+        );
+        setMoveState({
+          ...moveState,
+          preview: { col: newCol, row: newRow, width: selection.width, height: selection.height },
+        });
+        setTooltipInfo(null);
+        return;
+      }
 
       const region = getRegionAt(coords.col, coords.row);
       if (region && !isDragging) {
@@ -181,12 +220,19 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         setDragEnd(coords);
       }
     },
-    [getBlockCoords, isDragging, dragStart, getRegionAt, isPanning, clampPan, zoom]
+    [getBlockCoords, isDragging, dragStart, getRegionAt, isPanning, clampPan, zoom, moveState, selection]
   );
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) {
       setIsPanning(false);
+      return;
+    }
+    if (moveState) {
+      if (!hasOverlap(moveState.preview)) {
+        onSelectionChange(moveState.preview);
+      }
+      setMoveState(null);
       return;
     }
     if (isDragging && dragStart && dragEnd) {
@@ -198,7 +244,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     setIsDragging(false);
     setDragStart(null);
     setDragEnd(null);
-  }, [isPanning, isDragging, dragStart, dragEnd, normalizeSelection, hasOverlap, onSelectionChange]);
+  }, [isPanning, isDragging, dragStart, dragEnd, normalizeSelection, hasOverlap, onSelectionChange, moveState]);
 
   const handleMouseLeave = useCallback(() => {
     setHoveredBlock(null);
@@ -209,7 +255,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
       setDragStart(null);
       setDragEnd(null);
     }
-  }, [isDragging, isPanning]);
+    if (moveState) setMoveState(null);
+  }, [isDragging, isPanning, moveState]);
 
   // Wheel handler — must be non-passive to call preventDefault.
   // React's synthetic onWheel is passive by default.
@@ -727,14 +774,37 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         ctx.fillText(text, lx, ly);
       }
 
-      // Finalized selection
+      // Finalized selection (or live move preview)
       if (selection && !isDragging) {
-        ctx.fillStyle = "rgba(0, 224, 255, 0.10)";
-        ctx.fillRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
-        ctx.strokeStyle = "rgba(0, 224, 255, 0.9)";
+        const drawSel = moveState ? moveState.preview : selection;
+        const overlap = moveState ? hasOverlap(drawSel) : false;
+        const sx = drawSel.col * BLOCK_SIZE;
+        const sy = drawSel.row * BLOCK_SIZE;
+        const sw = drawSel.width * BLOCK_SIZE;
+        const sh = drawSel.height * BLOCK_SIZE;
+
+        if (!overlap && previewImage && previewImage.complete && previewImage.naturalWidth > 0) {
+          const nw = previewImage.naturalWidth;
+          const nh = previewImage.naturalHeight;
+          if (imageFit === "cover") {
+            const [srx, sry, srw, srh] = coverSourceRect(nw, nh, sw, sh);
+            ctx.drawImage(previewImage, srx, sry, srw, srh, sx, sy, sw, sh);
+          } else if (imageFit === "contain") {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(sx, sy, sw, sh);
+            const [dx, dy, dw, dh] = containDestRect(nw, nh, sx, sy, sw, sh);
+            ctx.drawImage(previewImage, dx, dy, dw, dh);
+          } else {
+            ctx.drawImage(previewImage, sx, sy, sw, sh);
+          }
+        } else {
+          ctx.fillStyle = overlap ? "rgba(220, 50, 50, 0.25)" : "rgba(0, 224, 255, 0.10)";
+          ctx.fillRect(sx, sy, sw, sh);
+        }
+        ctx.strokeStyle = overlap ? "rgba(220, 50, 50, 0.9)" : "rgba(0, 224, 255, 0.9)";
         ctx.lineWidth = 2 / zoom;
         ctx.setLineDash([4 / zoom, 4 / zoom]);
-        ctx.strokeRect(selection.col * BLOCK_SIZE, selection.row * BLOCK_SIZE, selection.width * BLOCK_SIZE, selection.height * BLOCK_SIZE);
+        ctx.strokeRect(sx, sy, sw, sh);
         ctx.setLineDash([]);
       }
     };
@@ -755,6 +825,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     regions, occupancy, loadedImages, animatedImages, isAssetHidden, hoveredBlock, isDragging, dragStart, dragEnd,
     selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan,
     showPricingOverlay, kbCursor, kbAnchor, hasAnimatedBoost, hasAnimatedGif, reducedMotion,
+    previewImage, imageFit, moveState,
   ]);
 
   const cursorLabel = kbCursor
@@ -765,7 +836,15 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
   const showHero = !showLoading && !heroDismissed && !selection && !isDragging && !kbCursor;
 
   return (
-    <div ref={containerRef} className="relative flex-1 overflow-hidden flex items-center justify-center bg-background p-2">
+    <div
+      ref={containerRef}
+      className="relative flex-1 overflow-hidden flex items-center justify-center bg-background p-2"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && selection) {
+          onSelectionChange(null);
+        }
+      }}
+    >
       <canvas
         ref={canvasRef}
         width={CANVAS_W}
@@ -773,7 +852,18 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         role="application"
         aria-label="Pixel canvas grid. Drag with mouse to select a region, or use arrow keys to move the cursor and Enter to start or finish a selection. Press Escape to cancel."
         tabIndex={0}
-        className={`max-w-full max-h-full border border-border rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isPanning ? "cursor-grabbing" : "cursor-crosshair"}`}
+        className={`max-w-full max-h-full border border-border rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          isPanning || moveState
+            ? "cursor-grabbing"
+            : selection &&
+                hoveredBlock &&
+                hoveredBlock.col >= selection.col &&
+                hoveredBlock.col < selection.col + selection.width &&
+                hoveredBlock.row >= selection.row &&
+                hoveredBlock.row < selection.row + selection.height
+              ? "cursor-grab"
+              : "cursor-crosshair"
+        }`}
         style={{ imageRendering: "pixelated" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

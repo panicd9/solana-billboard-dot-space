@@ -11,7 +11,7 @@ import {
   type Region,
   type Selection,
 } from "@/types/region";
-import { calculateRegionPrice, formatSol } from "@/solana/pricing";
+import { calculateRegionPrice, countCenterAndCurveBlocks, formatSol } from "@/solana/pricing";
 import { type AnimatedImage } from "@/hooks/useAnimatedImages";
 import { RegionContext, type RegionContextType } from "@/context/RegionContext";
 import { PREVIEW_PROJECTS } from "@/data/previewRegions";
@@ -19,7 +19,7 @@ import { PREVIEW_PROJECTS } from "@/data/previewRegions";
 const PREVIEW_OWNER = "Preview1111111111111111111111111111111111111";
 const PREVIEW_TOAST = () =>
   toast("Preview only", {
-    description: "This is a static demo — connect on the live canvas to mint.",
+    description: "This is a static demo — minting opens at launch.",
   });
 
 function buildRegions(): Region[] {
@@ -54,13 +54,19 @@ function buildRegions(): Region[] {
   });
 }
 
-export const MockRegionProvider = ({ children }: { children: ReactNode }) => {
+export const MockRegionProvider = ({
+  children,
+  empty = false,
+}: {
+  children: ReactNode;
+  empty?: boolean;
+}) => {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(
     new Map()
   );
 
-  const regions = useMemo(() => buildRegions(), []);
+  const regions = useMemo(() => (empty ? [] : buildRegions()), [empty]);
 
   const occupancy = useMemo(() => {
     const s = new Set<string>();
@@ -124,18 +130,35 @@ export const MockRegionProvider = ({ children }: { children: ReactNode }) => {
     [occupancy]
   );
 
-  const calculatePrice = useCallback((sel: Selection) => {
-    // Use curve at half-saturation so prices feel representative on the demo.
-    const curveBlocksSold = 9000;
-    const lamports = calculateRegionPrice(
-      sel.col,
-      sel.row,
-      sel.width,
-      sel.height,
-      curveBlocksSold
-    );
-    return { lamports, display: formatSol(lamports) };
-  }, []);
+  // Mirror on-chain reality: how many curve-zone blocks are already "sold"
+  // in this mock? Empty preview → 0; brand-seeded preview → actual count.
+  const curveBlocksSold = useMemo(() => {
+    let n = 0n;
+    for (const r of regions) {
+      const { curveCount } = countCenterAndCurveBlocks(
+        r.startX,
+        r.startY,
+        r.width,
+        r.height
+      );
+      n += curveCount;
+    }
+    return Number(n);
+  }, [regions]);
+
+  const calculatePrice = useCallback(
+    (sel: Selection) => {
+      const lamports = calculateRegionPrice(
+        sel.col,
+        sel.row,
+        sel.width,
+        sel.height,
+        curveBlocksSold
+      );
+      return { lamports, display: formatSol(lamports) };
+    },
+    [curveBlocksSold]
+  );
 
   const noop = useCallback(async () => {
     PREVIEW_TOAST();

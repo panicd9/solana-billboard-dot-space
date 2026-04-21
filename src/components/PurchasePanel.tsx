@@ -8,9 +8,10 @@ import {
   CheckCircle,
   Loader2,
   HelpCircle,
+  Crop,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Selection, BLOCK_SIZE } from "@/types/region";
+import { Selection, BLOCK_SIZE, GRID_COLS, GRID_ROWS } from "@/types/region";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
 import { countCenterAndCurveBlocks, formatSol } from "@/solana/pricing";
@@ -24,14 +25,16 @@ import {
 interface Props {
   selection: Selection | null;
   onClearSelection: () => void;
+  onSelectionChange: (sel: Selection) => void;
+  onPreviewImageChange?: (img: HTMLImageElement | null) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   showPricingOverlay: boolean;
   onTogglePricingOverlay: () => void;
 }
 
-const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollapse, showPricingOverlay, onTogglePricingOverlay }: Props) => {
-  const { purchaseRegion, calculatePrice } = useRegions();
+const PurchasePanel = ({ selection, onClearSelection, onSelectionChange, onPreviewImageChange, collapsed, onToggleCollapse, showPricingOverlay, onTogglePricingOverlay }: Props) => {
+  const { purchaseRegion, calculatePrice, hasOverlap } = useRegions();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [imageNaturalSize, setImageNaturalSize] = useState<{ w: number; h: number } | null>(null);
@@ -39,25 +42,24 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
   const [isPurchasing, setIsPurchasing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Reset preview when a new (different) selection is finalized
-  const prevSelectionRef = useRef<Selection | null>(null);
+  // Reset preview only when the user starts a *new* selection from scratch
+  // (i.e. selection transitioned through null). Drag-moving or fit-to-ratio
+  // mutate selection directly without a null in between, so the preview is
+  // preserved in those cases.
+  const wentThroughNullRef = useRef(false);
   useEffect(() => {
-    if (
-      selection &&
-      prevSelectionRef.current &&
-      (selection.col !== prevSelectionRef.current.col ||
-        selection.row !== prevSelectionRef.current.row ||
-        selection.width !== prevSelectionRef.current.width ||
-        selection.height !== prevSelectionRef.current.height)
-    ) {
+    if (selection === null) {
+      wentThroughNullRef.current = true;
+      return;
+    }
+    if (wentThroughNullRef.current) {
       setPreviewUrl(null);
       setPendingFile(null);
       setImageNaturalSize(null);
+      onPreviewImageChange?.(null);
+      wentThroughNullRef.current = false;
     }
-    if (selection) {
-      prevSelectionRef.current = selection;
-    }
-  }, [selection]);
+  }, [selection, onPreviewImageChange]);
 
   const totalBlocks = selection ? selection.width * selection.height : 0;
   const price = selection ? calculatePrice(selection) : null;
@@ -80,6 +82,7 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
     const img = new window.Image();
     img.onload = () => {
       setImageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+      onPreviewImageChange?.(img);
     };
     img.src = url;
     e.target.value = "";
@@ -103,6 +106,7 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
     setPendingFile(null);
     setImageNaturalSize(null);
     setLinkValue("");
+    onPreviewImageChange?.(null);
     onClearSelection();
   };
 
@@ -110,6 +114,42 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
     setPreviewUrl(null);
     setPendingFile(null);
     setImageNaturalSize(null);
+    onPreviewImageChange?.(null);
+  };
+
+  const handleFitToImageRatio = () => {
+    if (!selection || !imageNaturalSize) return;
+    const targetRatio = imageNaturalSize.w / imageNaturalSize.h;
+    const area = selection.width * selection.height;
+    const maxW = GRID_COLS - selection.col;
+    const maxH = GRID_ROWS - selection.row;
+
+    let newW = Math.max(1, Math.round(Math.sqrt(area * targetRatio)));
+    let newH = Math.max(1, Math.round(newW / targetRatio));
+    if (newW > maxW) {
+      newW = maxW;
+      newH = Math.max(1, Math.round(newW / targetRatio));
+    }
+    if (newH > maxH) {
+      newH = maxH;
+      newW = Math.max(1, Math.min(maxW, Math.round(newH * targetRatio)));
+    }
+
+    const candidate: Selection = {
+      col: selection.col,
+      row: selection.row,
+      width: newW,
+      height: newH,
+    };
+
+    if (candidate.width === selection.width && candidate.height === selection.height) {
+      return;
+    }
+    if (hasOverlap(candidate)) {
+      toast.error("Can't fit to image ratio — would overlap existing regions");
+      return;
+    }
+    onSelectionChange(candidate);
   };
 
   if (collapsed) {
@@ -277,6 +317,17 @@ const PurchasePanel = ({ selection, onClearSelection, collapsed, onToggleCollaps
                       </>
                     )}
                   </div>
+                )}
+                {ratioMatch !== null && ratioMatch >= 0.1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={handleFitToImageRatio}
+                  >
+                    <Crop className="w-3.5 h-3.5" />
+                    Fit region to image ratio
+                  </Button>
                 )}
               </div>
             )}
