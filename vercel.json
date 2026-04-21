@@ -3,6 +3,10 @@
     {
       "source": "/r/:assetId",
       "destination": "/api/share?assetId=:assetId"
+    },
+    {
+      "source": "/((?!api/|r/).*)",
+      "destination": "/index.html"
     }
   ]
 }

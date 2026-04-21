@@ -58,13 +58,17 @@ All region state is read from on-chain accounts via TanStack Query and exposed t
 
 | Path | Page |
 |------|------|
-| `/` | [Index](src/pages/Index.tsx) — canvas + marketplace toggle |
+| `/` | [ComingSoon](src/pages/ComingSoon.tsx) — pre-launch teaser (landing) |
+| `/app` | [Index](src/pages/Index.tsx) — canvas + marketplace toggle (the real app) |
+| `/preview` | [Preview](src/pages/Preview.tsx) — OG preview image |
+| `/preview-card` | [PreviewCard](src/pages/PreviewCard.tsx) — OG preview card |
 | `/u/:wallet` | [Profile](src/pages/Profile.tsx) — public owner profile |
 | `/embed/r/:assetId` | [Embed](src/pages/Embed.tsx) — iframe widget for a single region |
 | `/activity` | [Activity](src/pages/Activity.tsx) — program activity feed |
+| `/policy` | [Policy](src/pages/Policy.tsx) — content/moderation policy |
 | `*` | [NotFound](src/pages/NotFound.tsx) |
 
-Deep link: `/?region=<assetId>` on `/` auto-selects and opens a region once data loads.
+Deep link: `/app?region=<assetId>` auto-selects and opens a region once data loads.
 
 ### Key Components ([src/components/](src/components/))
 
