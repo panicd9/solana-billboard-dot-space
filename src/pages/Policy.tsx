@@ -8,7 +8,7 @@ const TAKEDOWN_URL =
   (import.meta.env.VITE_TAKEDOWN_URL as string | undefined)?.trim() || "";
 const CONTACT_EMAIL =
   (import.meta.env.VITE_MODERATION_CONTACT as string | undefined)?.trim() ||
-  "hello@solanabillboard.space";
+  "solanabillboard@proton.me";
 
 const Policy = () => (
   <div className="flex flex-col min-h-screen bg-background">
@@ -65,10 +65,9 @@ const Policy = () => (
         <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-6">
           <li>Child sexual abuse material (CSAM) — zero tolerance, removed on sight.</li>
           <li>Non-consensual intimate imagery.</li>
-          <li>Doxxing: private addresses, phone numbers, financial data, or government IDs.</li>
+          <li>Doxxing: financial data (SSNs, bank or card numbers) or government IDs.</li>
           <li>Direct incitement of violence or credible threats toward specific people.</li>
           <li>Malware, phishing kits, or links to sites hosting them.</li>
-          <li>Infringing copyrighted material or trademarks used to impersonate brands.</li>
           <li>Content that violates US or EU law in ways that expose our infrastructure providers
             to liability.</li>
         </ul>
@@ -76,17 +75,9 @@ const Policy = () => (
         <h2 className="text-lg font-semibold text-foreground mt-8 mb-2">What we don't moderate</h2>
         <p className="text-sm text-muted-foreground">
           Memes, strong opinions, crypto projects we personally don't like, NSFW-but-legal art,
-          and regions that just look ugly. This is a billboard, not a gallery.
+          political speech, dark humor, criticism of other projects or public figures, scam and
+          rug callouts, and unflattering memes of founders. This is a billboard, not a gallery.
         </p>
-
-        <h2 className="text-lg font-semibold text-foreground mt-8 mb-2">How review works</h2>
-        <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-6">
-          <li>Response SLA: <strong>24 hours</strong> for most reports, <strong>4 hours</strong>{" "}
-            for CSAM or imminent-harm reports.</li>
-          <li>If we take a region down, the decision and date are logged internally.</li>
-          <li>Owners can appeal to the contact address below. Good-faith appeals get a response.</li>
-          <li>We publish the hidden list publicly so the decisions are auditable.</li>
-        </ul>
 
         <h2 className="text-lg font-semibold text-foreground mt-8 mb-2">Report a region</h2>
         <p className="text-sm text-muted-foreground">
@@ -109,8 +100,8 @@ const Policy = () => (
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">
             {CONTACT_EMAIL}
           </a>
-          {" "}with the region URL or asset ID, the reason (IP / NSFW / illegal / other), and any
-          evidence. Anonymous reports are accepted; reports with a contact address get a reply.
+          {" "}with the region URL or asset ID, the reason, and any evidence. Anonymous reports
+          are accepted; reports with a contact address get a reply.
         </p>
 
         <h2 className="text-lg font-semibold text-foreground mt-8 mb-2">Appeals</h2>
