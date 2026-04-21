@@ -109,7 +109,7 @@ const ComingSoon = () => {
           <div className="mt-16 sm:mt-20">
             <ComingSoonCanvas />
             <p className="mt-3 text-center font-mono text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground">
-              192 × 108 · 20,736 pixels · one public canvas
+              1920 × 1080 pixels · one public canvas
             </p>
           </div>
         </section>
