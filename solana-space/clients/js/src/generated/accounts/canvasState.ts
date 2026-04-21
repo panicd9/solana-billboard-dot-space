@@ -57,13 +57,22 @@ export type CanvasState = {
   treasury: Address;
   /** Metaplex Core Collection address */
   collection: Address;
-  /** Total regions minted */
+  /** Total regions minted (count of NFTs) */
   totalMinted: number;
   /** Number of non-center blocks sold (drives bonding curve price) */
   curveBlocksSold: number;
+  /**
+   * Total blocks consumed across all minted regions (Σ width*height).
+   * Drives milestone events for the giveaway. Invariant: equals popcount(bitmap).
+   */
+  blocksMinted: number;
   /** Bump seed for this PDA */
   bump: number;
-  /** Padding for alignment */
+  /**
+   * Trailing padding: required to absorb implicit tail padding so the struct
+   * is bytemuck::Pod-safe (no uninitialized bytes). Struct alignment = 4 (u32),
+   * so the 1-byte `bump` + 2592-byte `bitmap` tail needs 3 bytes to round up.
+   */
   padding: ReadonlyUint8Array;
   /**
    * Occupancy bitmap: 1 bit per block, 20736 blocks = 2592 bytes
@@ -80,13 +89,22 @@ export type CanvasStateArgs = {
   treasury: Address;
   /** Metaplex Core Collection address */
   collection: Address;
-  /** Total regions minted */
+  /** Total regions minted (count of NFTs) */
   totalMinted: number;
   /** Number of non-center blocks sold (drives bonding curve price) */
   curveBlocksSold: number;
+  /**
+   * Total blocks consumed across all minted regions (Σ width*height).
+   * Drives milestone events for the giveaway. Invariant: equals popcount(bitmap).
+   */
+  blocksMinted: number;
   /** Bump seed for this PDA */
   bump: number;
-  /** Padding for alignment */
+  /**
+   * Trailing padding: required to absorb implicit tail padding so the struct
+   * is bytemuck::Pod-safe (no uninitialized bytes). Struct alignment = 4 (u32),
+   * so the 1-byte `bump` + 2592-byte `bitmap` tail needs 3 bytes to round up.
+   */
   padding: ReadonlyUint8Array;
   /**
    * Occupancy bitmap: 1 bit per block, 20736 blocks = 2592 bytes
@@ -106,6 +124,7 @@ export function getCanvasStateEncoder(): FixedSizeEncoder<CanvasStateArgs> {
       ["collection", getAddressEncoder()],
       ["totalMinted", getU32Encoder()],
       ["curveBlocksSold", getU32Encoder()],
+      ["blocksMinted", getU32Encoder()],
       ["bump", getU8Encoder()],
       ["padding", fixEncoderSize(getBytesEncoder(), 3)],
       ["bitmap", fixEncoderSize(getBytesEncoder(), 2592)],
@@ -123,6 +142,7 @@ export function getCanvasStateDecoder(): FixedSizeDecoder<CanvasState> {
     ["collection", getAddressDecoder()],
     ["totalMinted", getU32Decoder()],
     ["curveBlocksSold", getU32Decoder()],
+    ["blocksMinted", getU32Decoder()],
     ["bump", getU8Decoder()],
     ["padding", fixDecoderSize(getBytesDecoder(), 3)],
     ["bitmap", fixDecoderSize(getBytesDecoder(), 2592)],
@@ -191,5 +211,5 @@ export async function fetchAllMaybeCanvasState(
 }
 
 export function getCanvasStateSize(): number {
-  return 2708;
+  return 2712;
 }

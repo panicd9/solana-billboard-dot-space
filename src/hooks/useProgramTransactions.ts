@@ -107,7 +107,12 @@ export function useMintRegion() {
             next.add(`${x}:${y}`);
           }
         }
-        return { ...old, occupiedBlocks: next };
+        const added = variables.width * variables.height;
+        return {
+          ...old,
+          occupiedBlocks: next,
+          blocksMinted: (old.blocksMinted ?? 0) + added,
+        };
       });
 
       // Background refetch for eventual consistency

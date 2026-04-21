@@ -14,6 +14,7 @@ export function useCanvasState() {
         collection: account.data.collection,
         totalMinted: account.data.totalMinted,
         curveBlocksSold: account.data.curveBlocksSold,
+        blocksMinted: account.data.blocksMinted,
         occupiedBlocks: parseBitmap(account.data.bitmap),
       };
     },

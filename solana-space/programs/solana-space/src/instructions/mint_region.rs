@@ -6,6 +6,7 @@ use mpl_core::{
 };
 use crate::constants::*;
 use crate::error::ErrorCode;
+use crate::events::BlocksMinted;
 use crate::state::CanvasState;
 
 #[derive(AnchorDeserialize, AnchorSerialize)]
@@ -171,7 +172,10 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
     system_program::transfer(cpi_ctx, total_price)?;
 
     // 5. Mark bitmap as occupied and update counters
-    let bump = {
+    let added_blocks = (args.width as u32)
+        .checked_mul(args.height as u32)
+        .ok_or(ErrorCode::ArithmeticOverflow)?;
+    let (bump, blocks_minted_total) = {
         let mut canvas_state = ctx.accounts.canvas_state.load_mut()?;
         canvas_state.set_region_occupied(args.x, args.y, args.width, args.height);
         canvas_state.total_minted =
@@ -182,8 +186,19 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
             .curve_blocks_sold
             .checked_add(curve_count as u32)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
-        canvas_state.bump
+        canvas_state.blocks_minted = canvas_state
+            .blocks_minted
+            .checked_add(added_blocks)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        (canvas_state.bump, canvas_state.blocks_minted)
     };
+
+    let bps = ((blocks_minted_total as u64) * 10_000 / TOTAL_BLOCKS as u64) as u16;
+    emit!(BlocksMinted {
+        blocks_minted: blocks_minted_total,
+        total_blocks: TOTAL_BLOCKS as u32,
+        bps,
+    });
 
     // 6. Mint Metaplex Core NFT with Attributes plugin via CPI
     let signer_seeds: &[&[u8]] = &[CANVAS_SEED, &[bump]];
