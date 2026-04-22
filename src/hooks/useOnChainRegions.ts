@@ -3,7 +3,6 @@ import type { Address } from "@solana/kit";
 import type { Region } from "@/types/region";
 import {
   fetchAllCoreAssets,
-  fetchCoreAssetsByAddresses,
   fetchRegionsViaDAS,
   parseRegionAttributes,
   ipfsToGateway,
@@ -176,39 +175,11 @@ function parseRawCoreRows(accounts: CoreAssetRow[]): ParsedRegion[] {
 /**
  * Resolves the list of regions in the collection via the fastest available
  * path:
- *   1. localnet + `public/seed-assets.json` — getMultipleAccounts on known addresses
- *   2. DAS enabled (prod) — getAssetsByGroup via Helius/Triton/Shyft
- *   3. fallback — raw getProgramAccounts scan (slow on mainnet public RPC)
+ *   1. DAS enabled (prod) — getAssetsByGroup via Helius/Triton/Shyft
+ *   2. fallback — raw getProgramAccounts scan (used on localnet + devnet)
  */
 async function fetchRegions(): Promise<ParsedRegion[]> {
-  // 1. localnet bypass
-  if (config.network === "localnet") {
-    try {
-      const res = await fetch("/seed-assets.json", { cache: "no-store" });
-      if (res.ok) {
-        const manifest = (await res.json()) as {
-          collection?: string;
-          assets?: string[];
-        };
-        if (
-          manifest.collection === COLLECTION_ADDRESS &&
-          manifest.assets?.length
-        ) {
-          console.log(
-            `[useOnChainRegions] localnet bypass: fetching ${manifest.assets.length} seeded assets via getMultipleAccounts`,
-          );
-          const rows = (await fetchCoreAssetsByAddresses(
-            manifest.assets as Address[],
-          )) as unknown as CoreAssetRow[];
-          return parseRawCoreRows(rows);
-        }
-      }
-    } catch (err) {
-      console.warn("[useOnChainRegions] localnet bypass unavailable:", err);
-    }
-  }
-
-  // 2. DAS path (production — requires DAS-compatible RPC)
+  // 1. DAS path (production — requires DAS-compatible RPC)
   if (config.useDAS) {
     try {
       const rows = await fetchRegionsViaDAS(COLLECTION_ADDRESS);
