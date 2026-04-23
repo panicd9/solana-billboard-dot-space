@@ -58,8 +58,6 @@ echo "==> Starting surfpool (local validator + auto-deploy)…"
   cd solana-space
   NO_DNA=1 exec surfpool start \
     --no-tui \
-    --no-studio \
-    --disable-instruction-profiling
 ) &
 SURFPOOL_PID=$!
 
