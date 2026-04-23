@@ -7,6 +7,8 @@ import {
   signTransactionMessageWithSigners,
   sendAndConfirmTransactionFactory,
   getSignatureFromTransaction,
+  compileTransaction,
+  getBase64EncodedWireTransaction,
   generateKeyPairSigner,
   type TransactionSigner,
   type Address,
@@ -27,6 +29,22 @@ import { getRpc, getRpcSubscriptions } from "./accounts";
 const COMPUTE_BUDGET_PROGRAM =
   "ComputeBudget111111111111111111111111111111" as Address;
 
+// Compute-unit limits. MAX_CU is Solana's hard ceiling; we use it as the
+// simulation sandbox so `unitsConsumed` reflects the tx's true cost, not
+// a guessed budget. FALLBACK_CU is used only when simulation is unusable
+// (RPC outage, validator that doesn't support replaceRecentBlockhash).
+const MAX_CU = 1_400_000;
+const MIN_CU = 10_000;
+const FALLBACK_CU = 400_000;
+const CU_MARGIN = 1.1; // 10% headroom over simulated usage
+
+// Priority fee bounds (microLamports per CU). Floor keeps us above "free"
+// so we don't starve in light contention; ceiling caps per-tx cost even
+// when the network sees a fee-spike outlier.
+const PRIORITY_FEE_FLOOR: bigint = 10_000n;
+const PRIORITY_FEE_CEILING: bigint = 1_000_000n;
+const PRIORITY_FEE_CACHE_MS = 10_000;
+
 function getSetComputeUnitLimitInstruction(units: number): Instruction {
   const data = new Uint8Array(5);
   data[0] = 2; // SetComputeUnitLimit discriminator
@@ -38,25 +56,134 @@ function getSetComputeUnitLimitInstruction(units: number): Instruction {
   };
 }
 
+function getSetComputeUnitPriceInstruction(microLamports: bigint): Instruction {
+  const data = new Uint8Array(9);
+  data[0] = 3; // SetComputeUnitPrice discriminator
+  new DataView(data.buffer).setBigUint64(1, microLamports, true);
+  return {
+    programAddress: COMPUTE_BUDGET_PROGRAM,
+    accounts: [],
+    data,
+  };
+}
+
+let priorityFeeCache: { value: bigint; at: number } | null = null;
+
+async function estimatePriorityFeeMicroLamports(
+  rpc: ReturnType<typeof getRpc>
+): Promise<bigint> {
+  const now = Date.now();
+  if (priorityFeeCache && now - priorityFeeCache.at < PRIORITY_FEE_CACHE_MS) {
+    return priorityFeeCache.value;
+  }
+  let fee = PRIORITY_FEE_FLOOR;
+  try {
+    const samples = await rpc.getRecentPrioritizationFees().send();
+    const nonZero = samples
+      .map((s) => BigInt(s.prioritizationFee))
+      .filter((f) => f > 0n)
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    if (nonZero.length > 0) {
+      // 75th percentile balances cost vs. landing probability. p50 loses to
+      // anyone paying above median; p99 overpays during isolated spikes.
+      const idx = Math.min(Math.floor(nonZero.length * 0.75), nonZero.length - 1);
+      fee = nonZero[idx];
+    }
+  } catch (err) {
+    console.warn("getRecentPrioritizationFees failed, using floor:", err);
+  }
+  if (fee < PRIORITY_FEE_FLOOR) fee = PRIORITY_FEE_FLOOR;
+  if (fee > PRIORITY_FEE_CEILING) fee = PRIORITY_FEE_CEILING;
+  priorityFeeCache = { value: fee, at: now };
+  return fee;
+}
+
+async function simulateAndSizeCuLimit(
+  rpc: ReturnType<typeof getRpc>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  message: any
+): Promise<number> {
+  let wireTx: ReturnType<typeof getBase64EncodedWireTransaction>;
+  try {
+    wireTx = getBase64EncodedWireTransaction(compileTransaction(message));
+  } catch (err) {
+    console.warn("Could not compile tx for simulation, using fallback CU:", err);
+    return FALLBACK_CU;
+  }
+  try {
+    const { value: sim } = await rpc
+      .simulateTransaction(wireTx, {
+        encoding: "base64",
+        sigVerify: false,
+        replaceRecentBlockhash: true,
+        commitment: "confirmed",
+      })
+      .send();
+    if (sim.err) {
+      // Simulation explicitly failed — surface the on-chain error BEFORE
+      // prompting the wallet, so users don't sign a doomed transaction.
+      const logs = sim.logs?.join("\n") ?? JSON.stringify(sim.err);
+      throw new Error(`Transaction would fail on-chain:\n${logs}`);
+    }
+    const consumed = sim.unitsConsumed;
+    if (consumed == null) return FALLBACK_CU;
+    const sized = Math.ceil(Number(consumed) * CU_MARGIN);
+    return Math.max(MIN_CU, Math.min(MAX_CU, sized));
+  } catch (err) {
+    // Re-throw our own "would fail on-chain" errors; swallow transport /
+    // unsupported-method failures (some validators reject the config).
+    if (err instanceof Error && err.message.startsWith("Transaction would fail on-chain")) {
+      throw err;
+    }
+    console.warn("simulateTransaction failed, using fallback CU:", err);
+    return FALLBACK_CU;
+  }
+}
+
 async function buildAndSend(
   signer: TransactionSigner,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  instructions: readonly any[],
-  computeUnits = 400_000
+  instructions: readonly any[]
 ): Promise<string> {
   const rpc = getRpc();
   const rpcSubscriptions = getRpcSubscriptions();
-  const { value: blockhash } = await rpc.getLatestBlockhash().send();
+  const [{ value: blockhash }, priorityFee] = await Promise.all([
+    rpc.getLatestBlockhash({ commitment: "confirmed" }).send(),
+    estimatePriorityFeeMicroLamports(rpc),
+  ]);
 
-  const allInstructions = [
-    getSetComputeUnitLimitInstruction(computeUnits),
-    ...instructions,
-  ];
+  // First pass: build with MAX_CU so simulation measures real usage.
+  const simMessage = pipe(
+    createTransactionMessage({ version: 0 }),
+    (m) => setTransactionMessageFeePayer(signer.address, m),
+    (m) =>
+      appendTransactionMessageInstructions(
+        [
+          getSetComputeUnitLimitInstruction(MAX_CU),
+          getSetComputeUnitPriceInstruction(priorityFee),
+          ...instructions,
+        ],
+        m
+      ),
+    (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m)
+  );
 
+  const cuLimit = await simulateAndSizeCuLimit(rpc, simMessage);
+
+  // Second pass: rebuild with the tight CU limit — priority fee = CU × price,
+  // so sizing down directly reduces what the user pays.
   const message = pipe(
     createTransactionMessage({ version: 0 }),
     (m) => setTransactionMessageFeePayer(signer.address, m),
-    (m) => appendTransactionMessageInstructions(allInstructions, m),
+    (m) =>
+      appendTransactionMessageInstructions(
+        [
+          getSetComputeUnitLimitInstruction(cuLimit),
+          getSetComputeUnitPriceInstruction(priorityFee),
+          ...instructions,
+        ],
+        m
+      ),
     (m) => setTransactionMessageLifetimeUsingBlockhash(blockhash, m)
   );
 
