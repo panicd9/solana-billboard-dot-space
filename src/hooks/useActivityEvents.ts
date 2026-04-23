@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Signature } from "@solana/kit";
 import { getRpc } from "@/solana/accounts";
 import { SOLANA_SPACE_PROGRAM_ADDRESS } from "@/generated/programs";
+import { config } from "@/config/env";
 import {
   extractEventsFromTransaction,
   type ActivityEvent,
@@ -9,7 +10,7 @@ import {
 
 const SIGNATURE_LIMIT = 50;
 const FETCH_CONCURRENCY = 8;
-const STORAGE_KEY = "activity-cache-v1";
+const STORAGE_KEY = `activity-cache-${config.network}-v1`;
 const MAX_CACHED_EVENTS = 500;
 
 interface CachedActivity {
