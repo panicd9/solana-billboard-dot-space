@@ -1,4 +1,4 @@
-import { Grid, Tag, Activity as ActivityIcon, ShieldAlert, Flag } from "lucide-react";
+import { Grid, Tag, Activity as ActivityIcon, ShieldAlert, Flag, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,14 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import WalletButton from "@/components/WalletButton";
 import WalletBalances from "@/components/WalletBalances";
 import logo from "@/assets/logo.png";
 import { useRegions } from "@/context/RegionContext";
+import { BOOST_META_LIST, getBoostDescription } from "@/lib/boosts";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { formatSol } from "@/solana/pricing";
 
 const TAKEDOWN_URL =
   (import.meta.env.VITE_TAKEDOWN_URL as string | undefined)?.trim() || "";
@@ -22,6 +26,7 @@ interface Props {
 
 const CanvasToolbar = ({ view, onViewChange }: Props) => {
   const { isLoading, regions } = useRegions();
+  const reducedMotion = useReducedMotion();
   return (
     <header className="flex items-center justify-between gap-3 px-3 sm:px-5 py-2 border-b border-border bg-card/80 backdrop-blur-sm shrink-0">
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -84,6 +89,63 @@ const CanvasToolbar = ({ view, onViewChange }: Props) => {
 
       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 justify-end">
         <div className="flex items-center gap-0.5">
+          <Popover>
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="cursor-pointer text-muted-foreground hover:text-foreground h-8 w-8 p-0"
+                    aria-label="Boost legend"
+                  >
+                    <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipPrimitive.Portal>
+                <TooltipContent side="bottom" className="text-xs">Boost legend</TooltipContent>
+              </TooltipPrimitive.Portal>
+            </Tooltip>
+            <PopoverContent side="bottom" align="end" className="w-72 p-3">
+              <div className="space-y-2.5">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-wider uppercase text-foreground">
+                    Boosts
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Paid visibility upgrades. Each lasts 24 hours.
+                  </p>
+                </div>
+                <ul className="space-y-2 pt-0.5">
+                  {BOOST_META_LIST.map((m) => {
+                    const Icon = m.icon;
+                    return (
+                      <li key={m.kind} className="flex items-start gap-2.5 text-xs">
+                        <span
+                          className={`shrink-0 w-6 h-6 rounded-full inline-flex items-center justify-center ${m.dotClass}`}
+                          aria-hidden="true"
+                        >
+                          <Icon className="w-3 h-3" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-foreground font-semibold">{m.label}</span>
+                            <span className="font-mono text-muted-foreground text-[11px]">
+                              {formatSol(m.priceLamports)} SOL
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-snug">
+                            {getBoostDescription(m, reducedMotion)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
               <Button

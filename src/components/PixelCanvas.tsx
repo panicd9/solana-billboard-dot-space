@@ -710,7 +710,11 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         // Highlight boost — pulsing cyan inner glow (matches cyan-500 badge)
         if (hl) {
           const hPulse = reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 400);
-          const inset = Math.max(rw, rh) * (0.15 + hPulse * 0.20);
+          // Cap inset in absolute pixels so small regions (e.g. 2x2 blocks)
+          // don't get swallowed by the glow. Also cap at ~40% of the min side
+          // as a defensive ratio for very wide/tall regions.
+          const ratioInset = Math.max(rw, rh) * (0.15 + hPulse * 0.20);
+          const inset = Math.min(ratioInset, 24, Math.min(rw, rh) * 0.4);
           const glowAlpha = 0.2 + hPulse * 0.2;
 
           // Ramp from cyan-400 (34,211,238) to cyan-300 (103,232,249) — matches BOOST_META.highlight.
@@ -763,8 +767,12 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           const perimeter = 2 * (rw + rh);
           const snakeLen = perimeter * 0.3;
           const gapLen = perimeter - snakeLen;
-          const speed = reducedMotion ? 0 : now * 0.08;
-          const dashOffset = -(speed % perimeter);
+          // Time-constant loop: one full lap every ~4s regardless of region size.
+          // (Previously used a speed-constant px/ms, which made tiny regions
+          // whip around in <1s and giant regions crawl for 12+s.)
+          const LOOP_MS = 4000;
+          const t = reducedMotion ? 0 : (now % LOOP_MS) / LOOP_MS;
+          const dashOffset = -t * perimeter;
 
           ctx.save();
           ctx.strokeStyle = "rgba(153, 69, 255, 0.2)";
@@ -800,10 +808,13 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           ctx.strokeRect(rx, ry, rw, rh);
         }
 
-        if (tr) {
+        if (tr && Math.min(rw, rh) >= 20) {
           // Trending badge — rounded orange disc with a TrendingUp-style arrow,
           // top-right corner. Matches the BoostDot used in the marketplace.
-          const badge = Math.max(10, Math.min(16, Math.min(rw, rh) * 0.28));
+          // Skipped on <20px regions (unreadable; the Trending sidebar still
+          // surfaces them). Upper clamp raised to 24 so big regions don't
+          // get a pinprick badge.
+          const badge = Math.max(12, Math.min(24, Math.min(rw, rh) * 0.28));
           const inset = Math.max(2, badge * 0.18);
           const bx = rx + rw - badge - inset;
           const by = ry + inset;
@@ -811,6 +822,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           const cy = by + badge / 2;
           const br = badge / 2;
 
+          // Dark outer ring for contrast on bright imagery.
           ctx.save();
           ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
           ctx.shadowBlur = 3 / zoom;
@@ -819,6 +831,14 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           ctx.beginPath();
           ctx.arc(cx, cy, br, 0, Math.PI * 2);
           ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.strokeStyle = "rgba(28, 14, 0, 0.55)";
+          ctx.lineWidth = Math.max(0.75 / zoom, badge * 0.045);
+          ctx.beginPath();
+          ctx.arc(cx, cy, br, 0, Math.PI * 2);
+          ctx.stroke();
           ctx.restore();
 
           // Arrow: diagonal stroke pointing up-right + arrowhead at top-right.

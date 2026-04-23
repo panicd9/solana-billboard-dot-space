@@ -374,13 +374,20 @@ const RegionSidebar = () => {
             const Icon = m.icon;
             const remaining = formatBoostCountdown(boostSecondsRemaining(m.getAt(r), nowSec));
             return (
-              <span
-                key={m.kind}
-                className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${m.badgeClass}`}
-                title={`${m.label} · ${remaining} · ${getBoostDescription(m, reducedMotion)}`}
-              >
-                <Icon className="w-2.5 h-2.5" aria-hidden="true" /> {m.label} · {remaining}
-              </span>
+              <Tooltip key={m.kind} delayDuration={150}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${m.badgeClass}`}
+                    aria-label={`${m.label} boost, ${remaining} remaining`}
+                  >
+                    <Icon className="w-2.5 h-2.5" aria-hidden="true" /> {m.label} · {remaining}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-xs">
+                  {getBoostDescription(m, reducedMotion)}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
           <Tooltip delayDuration={150}>
@@ -583,9 +590,15 @@ const RegionSidebar = () => {
             <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
               Premium Boosts
             </p>
-            <Tooltip>
+            <Tooltip delayDuration={150}>
               <TooltipTrigger asChild>
-                <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                <button
+                  type="button"
+                  className="cursor-help inline-flex items-center justify-center w-4 h-4 rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="How boosts work"
+                >
+                  <Info className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[220px]">
                 <p className="text-xs">
@@ -624,7 +637,17 @@ const RegionSidebar = () => {
                   ) : boostInsufficient ? (
                     <AlertTriangle className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                   ) : (
-                    <Icon className={`w-4 h-4 ${m.iconClass}`} />
+                    <span className="relative inline-flex w-4 h-4 shrink-0">
+                      <Icon className={`w-4 h-4 ${m.iconClass}`} aria-hidden="true" />
+                      {active && (
+                        <span
+                          className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-background border border-border inline-flex items-center justify-center ${m.iconClass}`}
+                          aria-hidden="true"
+                        >
+                          <span className="text-[8px] font-bold leading-none">+</span>
+                        </span>
+                      )}
+                    </span>
                   )}
                   <span className="flex-1 text-left">
                     {boostInsufficient && boostAfford.kind === "short"
