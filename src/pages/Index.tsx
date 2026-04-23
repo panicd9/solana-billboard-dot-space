@@ -22,7 +22,7 @@ const Index = () => {
   const [heroDismissed, setHeroDismissed] = useState(() => {
     try { return localStorage.getItem(HERO_KEY) === "1"; } catch { return false; }
   });
-  const { setSelectedRegion, selectedRegion, regions } = useRegions();
+  const { setSelectedRegion, locateRegion, selectedRegion, regions } = useRegions();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Deep-link: /?region=<assetId> opens that region once regions load.
@@ -31,13 +31,13 @@ const Index = () => {
     if (!wanted) return;
     const match = regions.find((r) => r.id === wanted);
     if (match) {
-      setSelectedRegion(match);
+      locateRegion(match);
       setView("canvas");
       const next = new URLSearchParams(searchParams);
       next.delete("region");
       setSearchParams(next, { replace: true });
     }
-  }, [regions, searchParams, setSelectedRegion, setSearchParams]);
+  }, [regions, searchParams, locateRegion, setSearchParams]);
 
   const handleDismissHero = useCallback(() => {
     setHeroDismissed(true);
@@ -51,6 +51,17 @@ const Index = () => {
       setPurchasePanelOpen(false);
     },
     [setSelectedRegion]
+  );
+
+  // Region selected from outside the canvas (trending sidebar, etc.) — also
+  // wayfind on-canvas so the user can see where it is.
+  const handleRegionLocate = useCallback(
+    (region: Region) => {
+      locateRegion(region);
+      setSelection(null);
+      setPurchasePanelOpen(false);
+    },
+    [locateRegion]
   );
 
   const handleMarketplaceHighlight = useCallback(
@@ -86,7 +97,7 @@ const Index = () => {
         {view === "canvas" ? (
           <>
             <TrendingSidebar
-              onSelectRegion={handleRegionClick}
+              onSelectRegion={handleRegionLocate}
               collapsed={trendingCollapsed}
               onToggleCollapse={() => setTrendingCollapsed((c) => !c)}
             />

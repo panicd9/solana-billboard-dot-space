@@ -34,6 +34,7 @@ import {
   isBoostActive,
   boostSecondsRemaining,
   formatBoostCountdown,
+  effectiveOwner,
 } from "@/types/region";
 import { BOOST_META_LIST, getBoostDescription } from "@/lib/boosts";
 import { useNowSeconds } from "@/hooks/useNow";
@@ -97,7 +98,8 @@ const RegionSidebar = () => {
   const r = selectedRegion;
   const isBitmapOnly = r.id.startsWith("bitmap-");
   const hidden = !isBitmapOnly && isAssetHidden(r.id);
-  const shortOwner = r.owner ? `${r.owner.slice(0, 4)}...${r.owner.slice(-4)}` : "Unknown";
+  const displayOwner = effectiveOwner(r);
+  const shortOwner = displayOwner ? `${displayOwner.slice(0, 4)}...${displayOwner.slice(-4)}` : "Unknown";
   const totalBlocks = r.width * r.height;
   const walletAddr = wallet?.account?.address;
   const isOwner =
@@ -400,18 +402,18 @@ const RegionSidebar = () => {
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Owner</span>
           <div className="flex items-center gap-1.5">
-            {r.owner && (
+            {displayOwner && (
               <RouterLink
-                to={`/u/${r.owner}`}
+                to={`/u/${displayOwner}`}
                 className="inline-flex items-center gap-1 text-primary hover:underline"
                 title="View profile"
-                aria-label={`View profile for ${r.owner}`}
+                aria-label={`View profile for ${displayOwner}`}
               >
                 <User className="w-3 h-3" aria-hidden="true" />
                 {shortOwner}
               </RouterLink>
             )}
-            {!r.owner && <span className="text-muted-foreground">{shortOwner}</span>}
+            {!displayOwner && <span className="text-muted-foreground">{shortOwner}</span>}
           </div>
         </div>
         <div className="flex justify-between">
@@ -465,36 +467,6 @@ const RegionSidebar = () => {
           );
         })()}
 
-        {!isBitmapOnly && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <a
-              href={`https://solscan.io/account/${r.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-primary hover:underline"
-            >
-              <ExternalLink className="w-3 h-3" />
-              View on Solscan
-            </a>
-            <button
-              type="button"
-              onClick={async () => {
-                const embed = `<iframe src="${window.location.origin}/embed/r/${r.id}" width="320" height="180" frameborder="0" style="border:0;border-radius:8px"></iframe>`;
-                try {
-                  await navigator.clipboard.writeText(embed);
-                  toast.success("Embed code copied");
-                } catch {
-                  toast.error("Couldn't copy");
-                }
-              }}
-              className="cursor-pointer flex items-center gap-1 text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-              aria-label="Copy embed code"
-            >
-              <Code2 className="w-3 h-3" />
-              Copy embed
-            </button>
-          </div>
-        )}
         {isBitmapOnly && (
           <p className="text-xs text-muted-foreground italic">
             Full region data is loading...
@@ -579,8 +551,7 @@ const RegionSidebar = () => {
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[220px]">
                 <p className="text-xs">
-                  Boosts last 24h each. Re-buying while active extends by another 24h. Paid
-                  to the treasury.
+                  Boosts last 24h each. Re-buying while active extends by another 24h.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -733,6 +704,37 @@ const RegionSidebar = () => {
           )
         )}
       </div>
+
+      {!isBitmapOnly && (
+        <div className="px-4 pb-4 pt-3 border-t border-border flex items-center gap-3 flex-wrap">
+          <a
+            href={`https://solscan.io/account/${r.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ExternalLink className="w-3 h-3" />
+            View on Solscan
+          </a>
+          <button
+            type="button"
+            onClick={async () => {
+              const embed = `<iframe src="${window.location.origin}/embed/r/${r.id}" width="320" height="180" frameborder="0" style="border:0;border-radius:8px"></iframe>`;
+              try {
+                await navigator.clipboard.writeText(embed);
+                toast.success("Embed code copied");
+              } catch {
+                toast.error("Couldn't copy");
+              }
+            }}
+            className="cursor-pointer flex items-center gap-1 text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            aria-label="Copy embed code"
+          >
+            <Code2 className="w-3 h-3" />
+            Copy embed
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

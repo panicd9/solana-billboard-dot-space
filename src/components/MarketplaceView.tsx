@@ -12,6 +12,7 @@ import {
   isBoostActive,
   boostSecondsRemaining,
   formatBoostCountdown,
+  effectiveOwner,
 } from "@/types/region";
 
 interface Props {
@@ -22,7 +23,7 @@ type SortKey = "price" | "size" | "recent";
 type FilterKey = "all" | "listed" | "unlisted" | "boosted";
 
 const MarketplaceView = ({ onHighlightRegion }: Props) => {
-  const { regions, setSelectedRegion, isLoading, isAssetHidden } = useRegions();
+  const { regions, locateRegion, isLoading, isAssetHidden } = useRegions();
   const nowSec = useNowSeconds(30_000);
   const [sortBy, setSortBy] = useState<SortKey>("recent");
   const [filterBy, setFilterBy] = useState<FilterKey>("all");
@@ -41,7 +42,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
     else if (filterBy === "boosted") filtered = filtered.filter((r) => boostCount(r) > 0);
     if (q) {
       filtered = filtered.filter((r) =>
-        r.owner.toLowerCase().includes(q) || r.linkUrl?.toLowerCase().includes(q)
+        effectiveOwner(r).toLowerCase().includes(q) || r.linkUrl?.toLowerCase().includes(q)
       );
     }
     const copy = [...filtered];
@@ -166,7 +167,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                   type="button"
                   className="text-left bg-card border border-border rounded-lg overflow-hidden hover:border-primary/40 transition-colors cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   onClick={() => {
-                    setSelectedRegion(r);
+                    locateRegion(r);
                     onHighlightRegion(r.id);
                   }}
                   aria-label={`Region at ${r.startX},${r.startY}, ${r.width} by ${r.height}, ${currentPrice ? `listed at ${currentPrice} SOL` : "not listed"}`}
@@ -214,7 +215,10 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                     <div className="flex justify-between pt-1 border-t border-border">
                       <span className="text-muted-foreground">Owner</span>
                       <span className="text-foreground">
-                        {r.owner.slice(0, 4)}...{r.owner.slice(-4)}
+                        {(() => {
+                          const o = effectiveOwner(r);
+                          return `${o.slice(0, 4)}...${o.slice(-4)}`;
+                        })()}
                       </span>
                     </div>
                     <div className="flex justify-between">

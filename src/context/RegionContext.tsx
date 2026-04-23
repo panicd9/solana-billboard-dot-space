@@ -24,11 +24,25 @@ import {
 import { calculateRegionPrice, formatSol } from "@/solana/pricing";
 import { ipfsToGateway } from "@/solana/accounts";
 
+export interface PendingLocate {
+  region: Region;
+  id: number;
+}
+
 export interface RegionContextType {
   regions: Region[];
   occupancy: Set<string>; // "x:y"
   selectedRegion: Region | null;
   setSelectedRegion: (r: Region | null) => void;
+  /**
+   * Select a region AND request the canvas to wayfind to it (pan + pulse ring).
+   * Use this for selections originating outside the canvas (trending sidebar,
+   * marketplace, deep links) so the user can see where on the grid the region
+   * is. Canvas clicks should use `setSelectedRegion` directly.
+   */
+  locateRegion: (r: Region) => void;
+  pendingLocate: PendingLocate | null;
+  clearPendingLocate: () => void;
   isOccupied: (col: number, row: number) => boolean;
   getRegionAt: (col: number, row: number) => Region | undefined;
   hasOverlap: (sel: Selection) => boolean;
@@ -67,7 +81,17 @@ export const useRegions = () => {
 
 export const RegionProvider = ({ children }: { children: ReactNode }) => {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [pendingLocate, setPendingLocate] = useState<PendingLocate | null>(null);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+
+  const locateRegion = useCallback((r: Region) => {
+    setSelectedRegion(r);
+    setPendingLocate({ region: r, id: Date.now() });
+  }, []);
+
+  const clearPendingLocate = useCallback(() => {
+    setPendingLocate(null);
+  }, []);
 
   // On-chain data hooks
   const canvasState = useCanvasState();
@@ -350,6 +374,9 @@ export const RegionProvider = ({ children }: { children: ReactNode }) => {
         occupancy,
         selectedRegion,
         setSelectedRegion,
+        locateRegion,
+        pendingLocate,
+        clearPendingLocate,
         isOccupied,
         getRegionAt,
         hasOverlap,

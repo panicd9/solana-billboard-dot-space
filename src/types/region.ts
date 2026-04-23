@@ -27,6 +27,14 @@ export interface Region {
   trendingAt: bigint;
 }
 
+// While a region is listed, the on-chain asset is escrowed to the listing PDA,
+// so `r.owner` becomes that PDA address rather than the real seller. Use this
+// helper whenever you want to display or filter by the wallet that actually
+// controls the region.
+export function effectiveOwner(r: Region): string {
+  return r.isListed && r.listing ? r.listing.seller : r.owner;
+}
+
 export interface Selection {
   col: number;
   row: number;

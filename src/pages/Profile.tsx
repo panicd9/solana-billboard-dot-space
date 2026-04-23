@@ -15,7 +15,7 @@ import { useNowSeconds } from "@/hooks/useNow";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import { BOOST_META_LIST } from "@/lib/boosts";
 import logo from "@/assets/logo.png";
-import { isBoostActive, boostSecondsRemaining, formatBoostCountdown, type Region } from "@/types/region";
+import { isBoostActive, boostSecondsRemaining, formatBoostCountdown, effectiveOwner, type Region } from "@/types/region";
 
 const shortAddr = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -31,7 +31,7 @@ const avatarGradient = (addr: string): string => {
 const Profile = () => {
   const { wallet: walletParam } = useParams<{ wallet: string }>();
   const navigate = useNavigate();
-  const { regions, isLoading, setSelectedRegion, isAssetHidden } = useRegions();
+  const { regions, isLoading, locateRegion, isAssetHidden } = useRegions();
   const { wallet: connectedWallet } = useWalletConnection();
   const connected = connectedWallet?.account?.address;
 
@@ -40,7 +40,7 @@ const Profile = () => {
   const isSelf = connected === addr;
 
   const owned = useMemo(
-    () => regions.filter((r) => r.owner === addr),
+    () => regions.filter((r) => effectiveOwner(r) === addr),
     [regions, addr]
   );
 
@@ -69,8 +69,8 @@ const Profile = () => {
   };
 
   const handleOpenRegion = (r: Region) => {
-    setSelectedRegion(r);
-    navigate("/");
+    locateRegion(r);
+    navigate("/app");
   };
 
   return (

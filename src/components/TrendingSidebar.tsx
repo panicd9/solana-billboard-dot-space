@@ -4,6 +4,7 @@ import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import {
   boostSecondsRemaining,
   formatBoostCountdown,
+  effectiveOwner,
   type Region,
 } from "@/types/region";
 import { BOOST_META } from "@/lib/boosts";
@@ -69,7 +70,10 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-mono text-foreground truncate">
-                    {r.owner.slice(0, 4)}...{r.owner.slice(-4)}
+                    {(() => {
+                      const o = effectiveOwner(r);
+                      return `${o.slice(0, 4)}...${o.slice(-4)}`;
+                    })()}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {r.width}x{r.height} · ({r.startX},{r.startY})
