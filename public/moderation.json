@@ -1,9 +1,4 @@
 {
   "version": 1,
-  "hidden": {
-    "2qLj1HEVzKJL3PzyXepG8Kqy1tQ9o35bArcEoqWbD1Fv": {
-      "reason": "DEMO — remove this entry to restore the region",
-      "date": "2026-04-20"
-    }
-  }
+  "hidden": {}
 }

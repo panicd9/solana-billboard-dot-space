@@ -70,7 +70,7 @@ const Profile = () => {
 
   const handleOpenRegion = (r: Region) => {
     locateRegion(r);
-    navigate("/app");
+    navigate("/");
   };
 
   return (

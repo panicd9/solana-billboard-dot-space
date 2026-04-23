@@ -6,7 +6,6 @@ use mpl_core::{
 };
 use crate::constants::*;
 use crate::error::ErrorCode;
-use crate::events::BlocksMinted;
 use crate::state::CanvasState;
 
 #[derive(AnchorDeserialize, AnchorSerialize)]
@@ -196,11 +195,13 @@ pub fn mint_region_handler(ctx: Context<MintRegion>, args: MintRegionArgs) -> Re
     };
 
     let bps = ((blocks_minted_total as u64) * 10_000 / TOTAL_BLOCKS as u64) as u16;
-    emit!(BlocksMinted {
-        blocks_minted: blocks_minted_total,
-        total_blocks: TOTAL_BLOCKS as u32,
-        bps,
-    });
+    msg!(
+        "Blocks minted {}/{}; filled {}.{:02}%",
+        blocks_minted_total,
+        TOTAL_BLOCKS,
+        bps / 100,
+        bps % 100,
+    );
 
     // 6. Mint Metaplex Core NFT with Attributes plugin via CPI
     let signer_seeds: &[&[u8]] = &[CANVAS_SEED, &[bump]];

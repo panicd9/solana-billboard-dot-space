@@ -26,7 +26,7 @@ npm run test:watch   # Watch mode (vitest)
 
 ### On-chain Integration
 
-This app talks to a deployed Anchor/Solana program (program ID in [src/config/env.ts](src/config/env.ts), default `DQ1tBHL6cmuUtYAbxvTVvvaNEZtXP1byKeb51gvxWvr2`). Network, RPC/WS URLs, collection address, treasury wallet, and Pinata credentials are all `VITE_*` env vars with devnet defaults. **All payments are in native SOL — no SPL token flows.**
+This app talks to a deployed Anchor/Solana program (program ID in [src/config/env.ts](src/config/env.ts), default `SBaMPg4GAto7N7LRv7vXKsS4FiNz3R9aCyVSEE2cQPa`). Network, RPC/WS URLs, collection address, treasury wallet, and Pinata credentials are all `VITE_*` env vars with devnet defaults. **All payments are in native SOL — no SPL token flows.**
 
 - [src/solana/constants.ts](src/solana/constants.ts) — program addresses, grid dims, pricing constants, boost flags (must match Rust `constants.rs`).
 - [src/solana/pricing.ts](src/solana/pricing.ts) — `calculateRegionPrice` mirrors the on-chain pricing function; `calculateListingCurrentPrice` computes the current Dutch-auction price.
@@ -58,8 +58,7 @@ All region state is read from on-chain accounts via TanStack Query and exposed t
 
 | Path | Page |
 |------|------|
-| `/` | [ComingSoon](src/pages/ComingSoon.tsx) — pre-launch teaser (landing) |
-| `/app` | [Index](src/pages/Index.tsx) — canvas + marketplace toggle (the real app) |
+| `/` | [Index](src/pages/Index.tsx) — canvas + marketplace toggle (the main app) |
 | `/preview` | [Preview](src/pages/Preview.tsx) — OG preview image |
 | `/preview-card` | [PreviewCard](src/pages/PreviewCard.tsx) — OG preview card |
 | `/u/:wallet` | [Profile](src/pages/Profile.tsx) — public owner profile |
@@ -68,7 +67,7 @@ All region state is read from on-chain accounts via TanStack Query and exposed t
 | `/policy` | [Policy](src/pages/Policy.tsx) — content/moderation policy |
 | `*` | [NotFound](src/pages/NotFound.tsx) |
 
-Deep link: `/app?region=<assetId>` auto-selects and opens a region once data loads.
+Deep link: `/?region=<assetId>` auto-selects and opens a region once data loads.
 
 ### Key Components ([src/components/](src/components/))
 

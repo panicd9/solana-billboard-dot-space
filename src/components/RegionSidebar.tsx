@@ -14,6 +14,7 @@ import {
   Code2,
   ShieldAlert,
   Share2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,12 @@ import {
 import { BOOST_META_LIST, getBoostDescription } from "@/lib/boosts";
 import { useNowSeconds } from "@/hooks/useNow";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import {
+  computeAffordability,
+  useAffordability,
+  useLamportBalance,
+  TX_FEE_BUFFER_LAMPORTS,
+} from "@/hooks/useAffordability";
 import {
   calculateListingCurrentPrice,
   formatSol,
@@ -116,6 +123,17 @@ const RegionSidebar = () => {
           r.listing.endTime
         )
       : null;
+
+  // Match the +100 bps slippage buffer that useExecutePurchase applies on
+  // send — if the user doesn't have enough for that cap, the tx would bounce
+  // with SlippageExceeded under a price uptick. See useProgramTransactions.ts.
+  const listingMaxPrice =
+    currentListingPrice !== null
+      ? currentListingPrice + (currentListingPrice * 100n) / 10_000n
+      : null;
+  const listingAfford = useAffordability(listingMaxPrice);
+  const listingInsufficient = listingAfford.kind === "short";
+  const { lamports: walletLamports, connected: walletConnected } = useLamportBalance();
 
   const withBusy = async (action: string, fn: () => Promise<void>) => {
     setBusyAction(action);
@@ -565,24 +583,35 @@ const RegionSidebar = () => {
               : null;
             const busy = busyAction === `boost-${m.flag}`;
             const anyBoostBusy = busyAction?.startsWith("boost-") ?? false;
+            const boostAfford = computeAffordability(
+              walletLamports,
+              m.priceLamports,
+              TX_FEE_BUFFER_LAMPORTS,
+              walletConnected,
+            );
+            const boostInsufficient = boostAfford.kind === "short";
             return (
               <div key={m.kind} className="space-y-1">
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full gap-2 justify-start"
-                  disabled={anyBoostBusy}
+                  disabled={anyBoostBusy || boostInsufficient}
                   onClick={() => handleBoost(m.flag)}
                 >
                   {busy ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : boostInsufficient ? (
+                    <AlertTriangle className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                   ) : (
                     <Icon className={`w-4 h-4 ${m.iconClass}`} />
                   )}
                   <span className="flex-1 text-left">
-                    {active
-                      ? `Extend ${m.label} 24h`
-                      : `${m.label} 24h`}
+                    {boostInsufficient && boostAfford.kind === "short"
+                      ? `Need ${formatSol(boostAfford.shortfall)} more SOL`
+                      : active
+                        ? `Extend ${m.label} 24h`
+                        : `${m.label} 24h`}
                   </span>
                   <span className="text-muted-foreground">{m.priceSol} SOL</span>
                 </Button>
@@ -625,14 +654,24 @@ const RegionSidebar = () => {
                 size="sm"
                 className="w-full gap-2"
                 onClick={handleBuy}
-                disabled={busyAction === "buy"}
+                disabled={busyAction === "buy" || listingInsufficient}
               >
                 {busyAction === "buy" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Buy for {formatSol(currentListingPrice)} SOL
+                  </>
+                ) : listingInsufficient && listingAfford.kind === "short" ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+                    Need {formatSol(listingAfford.shortfall)} more SOL
+                  </>
                 ) : (
-                  <ShoppingCart className="w-4 h-4" />
+                  <>
+                    <ShoppingCart className="w-4 h-4" />
+                    Buy for {formatSol(currentListingPrice)} SOL
+                  </>
                 )}
-                Buy for {formatSol(currentListingPrice)} SOL
               </Button>
             )}
           </>

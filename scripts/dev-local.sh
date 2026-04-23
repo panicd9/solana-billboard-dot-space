@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PROGRAM_ID="E8uWtqn6TESpP5aPzzXYgKf6yhwDJP1ACikKPW6X8Lm6"
+PROGRAM_ID="SBaMPg4GAto7N7LRv7vXKsS4FiNz3R9aCyVSEE2cQPa"
 RPC_URL="http://127.0.0.1:8899"
 
 SURFPOOL_PID=""

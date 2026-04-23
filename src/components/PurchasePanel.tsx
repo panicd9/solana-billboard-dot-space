@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Selection, BLOCK_SIZE, GRID_COLS, GRID_ROWS } from "@/types/region";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
+import { useAffordability } from "@/hooks/useAffordability";
 import { countCenterAndCurveBlocks, formatSol } from "@/solana/pricing";
 import {
   CENTER_PRICE_PER_BLOCK,
@@ -63,6 +64,8 @@ const PurchasePanel = ({ selection, onClearSelection, onSelectionChange, onPrevi
 
   const totalBlocks = selection ? selection.width * selection.height : 0;
   const price = selection ? calculatePrice(selection) : null;
+  const affordability = useAffordability(price?.lamports ?? null);
+  const insufficientFunds = affordability.kind === "short";
 
   const regionPixelW = selection ? selection.width * BLOCK_SIZE : 0;
   const regionPixelH = selection ? selection.height * BLOCK_SIZE : 0;
@@ -206,13 +209,13 @@ const PurchasePanel = ({ selection, onClearSelection, onSelectionChange, onPrevi
           <div className="flex justify-between text-muted-foreground">
             <span>Size</span>
             <span className="text-primary">
-              {selection.width}x{selection.height}
+              {selection.width} x {selection.height}
             </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
             <span>Pixels</span>
             <span className="text-foreground">
-              {regionPixelW}x{regionPixelH}px
+              {regionPixelW} x {regionPixelH} px
             </span>
           </div>
           <div className="flex justify-between text-muted-foreground">
@@ -250,7 +253,7 @@ const PurchasePanel = ({ selection, onClearSelection, onSelectionChange, onPrevi
           htmlFor="purchase-image-file"
           className="block text-xs text-muted-foreground font-semibold uppercase tracking-wider"
         >
-          Image Preview (optional)
+          Image (optional)
         </label>
         <input
           id="purchase-image-file"
@@ -383,12 +386,17 @@ const PurchasePanel = ({ selection, onClearSelection, onSelectionChange, onPrevi
           onClick={handleBuy}
           className="w-full gap-2"
           size="sm"
-          disabled={!selection || isPurchasing}
+          disabled={!selection || isPurchasing || insufficientFunds}
         >
           {isPurchasing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Processing...
+            </>
+          ) : insufficientFunds ? (
+            <>
+              <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+              Need {formatSol(affordability.shortfall)} more SOL
             </>
           ) : (
             <>

@@ -1,17 +1,15 @@
 pub mod constants;
 pub mod error;
-pub mod events;
 pub mod instructions;
 pub mod state;
 
 use anchor_lang::prelude::*;
 
 pub use constants::*;
-pub use events::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("E8uWtqn6TESpP5aPzzXYgKf6yhwDJP1ACikKPW6X8Lm6");
+declare_id!("SBaMPg4GAto7N7LRv7vXKsS4FiNz3R9aCyVSEE2cQPa");
 
 #[program]
 pub mod solana_space {

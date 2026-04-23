@@ -88,7 +88,7 @@ export function getBoostDescription(meta: BoostMeta, reducedMotion: boolean): st
 }
 
 export const BOOST_META_LIST: readonly BoostMeta[] = [
+  BOOST_META.trending,
   BOOST_META.highlight,
   BOOST_META.glow,
-  BOOST_META.trending,
 ];
