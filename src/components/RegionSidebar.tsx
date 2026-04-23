@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRegions } from "@/context/RegionContext";
 import { toast } from "sonner";
 import {
@@ -83,6 +84,7 @@ const RegionSidebar = () => {
   const { wallet } = useWalletConnection();
   const nowSec = useNowSeconds(1000);
   const reducedMotion = useReducedMotion();
+  const [listingMode, setListingMode] = useState<"fixed" | "dynamic">("fixed");
   const [startPrice, setStartPrice] = useState("");
   const [endPrice, setEndPrice] = useState("");
   const [duration, setDuration] = useState("86400"); // 24h default
@@ -148,16 +150,24 @@ const RegionSidebar = () => {
 
   const handleList = () => {
     const spLamports = parseSolInputToLamports(startPrice);
-    const epLamports = parseSolInputToLamports(endPrice);
     if (spLamports === null) {
-      toast.error("Enter a valid start price (max 1,000,000 SOL, up to 9 decimals)");
+      toast.error(
+        listingMode === "fixed"
+          ? "Enter a valid price (max 1,000,000 SOL, up to 9 decimals)"
+          : "Enter a valid start price (max 1,000,000 SOL, up to 9 decimals)"
+      );
       return;
     }
+    const epLamports =
+      listingMode === "fixed" ? spLamports : parseSolInputToLamports(endPrice);
     if (epLamports === null) {
       toast.error("Enter a valid end price (max 1,000,000 SOL, up to 9 decimals)");
       return;
     }
-    const dur = parseInt(duration);
+    // Fixed-price listings don't decay, so duration is cosmetic — the program
+    // only rejects duration == 0. Pass 1s so end_time is in the past and the
+    // price is always the flat end_price (== start_price).
+    const dur = listingMode === "fixed" ? 1 : parseInt(duration);
     if (isNaN(dur) || dur <= 0) {
       toast.error("Enter a valid duration");
       return;
@@ -206,7 +216,7 @@ const RegionSidebar = () => {
     const coords = `(${r.startX},${r.startY})`;
     const blocks = totalBlocks;
     if (isOwner && r.isListed) {
-      return `Listing my region on @solanabillboard — Dutch auction, price drops every block until someone takes it\n\n${blocks} pixels at ${coords}`;
+      return `Listing my region on @solanabillboard — live price moves every block until someone takes it\n\n${blocks} pixels at ${coords}`;
     }
     if (isOwner) {
       return `I planted a flag on @solanabillboard 🪩\n\n${blocks} pixels at ${coords} — pick yours before they fill`;
@@ -677,54 +687,111 @@ const RegionSidebar = () => {
           </>
         ) : (
           isOwner && (
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-3">
+              <Tabs
+                value={listingMode}
+                onValueChange={(v) => setListingMode(v as "fixed" | "dynamic")}
+              >
+                <TabsList className="grid grid-cols-2 w-full h-8 p-0.5">
+                  <TabsTrigger value="fixed" className="text-[11px] h-7">
+                    Fixed price
+                  </TabsTrigger>
+                  <TabsTrigger value="dynamic" className="text-[11px] h-7">
+                    Dynamic price
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {listingMode === "fixed" ? (
                 <div>
-                  <label htmlFor="listing-start-price" className="sr-only">
-                    Start price in SOL
+                  <label
+                    htmlFor="listing-start-price"
+                    className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    Price (SOL)
                   </label>
                   <input
                     id="listing-start-price"
                     type="number"
+                    inputMode="decimal"
                     step="0.001"
-                    placeholder="Start (SOL)"
+                    min="0"
+                    placeholder="0.200"
                     value={startPrice}
                     onChange={(e) => setStartPrice(e.target.value)}
                     className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
-                <div>
-                  <label htmlFor="listing-end-price" className="sr-only">
-                    End price in SOL
-                  </label>
-                  <input
-                    id="listing-end-price"
-                    type="number"
-                    step="0.001"
-                    placeholder="End (SOL)"
-                    value={endPrice}
-                    onChange={(e) => setEndPrice(e.target.value)}
-                    className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label
+                      htmlFor="listing-start-price"
+                      className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      Start (SOL)
+                    </label>
+                    <input
+                      id="listing-start-price"
+                      type="number"
+                      inputMode="decimal"
+                      step="0.001"
+                      min="0"
+                      placeholder="0.500"
+                      value={startPrice}
+                      onChange={(e) => setStartPrice(e.target.value)}
+                      className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="listing-end-price"
+                      className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      End (SOL)
+                    </label>
+                    <input
+                      id="listing-end-price"
+                      type="number"
+                      inputMode="decimal"
+                      step="0.001"
+                      min="0"
+                      placeholder="0.100"
+                      value={endPrice}
+                      onChange={(e) => setEndPrice(e.target.value)}
+                      className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label htmlFor="listing-duration" className="sr-only">
-                  Listing duration
-                </label>
-                <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger id="listing-duration" className="h-9 text-xs font-mono">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3600">1 hour</SelectItem>
-                    <SelectItem value="21600">6 hours</SelectItem>
-                    <SelectItem value="86400">24 hours</SelectItem>
-                    <SelectItem value="259200">3 days</SelectItem>
-                    <SelectItem value="604800">7 days</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              )}
+              {listingMode === "dynamic" && (
+                <div>
+                  <label
+                    htmlFor="listing-duration"
+                    className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    Price-drop window
+                  </label>
+                  <Select value={duration} onValueChange={setDuration}>
+                    <SelectTrigger id="listing-duration" className="h-9 text-xs font-mono">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3600">1 hour</SelectItem>
+                      <SelectItem value="21600">6 hours</SelectItem>
+                      <SelectItem value="86400">24 hours</SelectItem>
+                      <SelectItem value="259200">3 days</SelectItem>
+                      <SelectItem value="604800">7 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <ListingPreview
+                mode={listingMode}
+                startPrice={startPrice}
+                endPrice={endPrice}
+                durationSeconds={duration}
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -776,6 +843,69 @@ const RegionSidebar = () => {
       )}
     </aside>
   );
+};
+
+type ListingPreviewProps = {
+  mode: "fixed" | "dynamic";
+  startPrice: string;
+  endPrice: string;
+  durationSeconds: string;
+};
+
+const ListingPreview = ({ mode, startPrice, endPrice, durationSeconds }: ListingPreviewProps) => {
+  const sp = parseSolInputToLamports(startPrice);
+  const ep =
+    mode === "fixed" ? sp : parseSolInputToLamports(endPrice);
+  const durSec = parseInt(durationSeconds);
+  const durationLabel = DURATION_LABELS[durationSeconds] ?? `${durSec}s`;
+
+  if (sp === null || ep === null || isNaN(durSec) || durSec <= 0) {
+    return (
+      <p className="text-[10px] text-muted-foreground leading-snug">
+        {mode === "fixed"
+          ? "Enter a price to preview what buyers pay."
+          : "Enter start and end prices to preview the price curve."}
+      </p>
+    );
+  }
+
+  if (mode === "fixed") {
+    return (
+      <p className="text-[10px] text-muted-foreground leading-snug">
+        Buyers pay <span className="text-foreground font-mono">{formatSol(sp)} SOL</span>{" "}
+        until you cancel the listing.
+      </p>
+    );
+  }
+
+  if (ep === sp) {
+    return (
+      <p className="text-[10px] text-muted-foreground leading-snug">
+        Start and end prices match — this is effectively a fixed price at{" "}
+        <span className="text-foreground font-mono">{formatSol(sp)} SOL</span>.
+      </p>
+    );
+  }
+  const verb = ep < sp ? "drops" : "rises";
+  return (
+    <p className="text-[10px] text-muted-foreground leading-snug">
+      Price {verb} from{" "}
+      <span className="text-foreground font-mono">{formatSol(sp)}</span>
+      {" → "}
+      <span className="text-foreground font-mono">{formatSol(ep)} SOL</span>{" "}
+      over {durationLabel}, then holds at{" "}
+      <span className="text-foreground font-mono">{formatSol(ep)} SOL</span>{" "}
+      until sold or cancelled.
+    </p>
+  );
+};
+
+const DURATION_LABELS: Record<string, string> = {
+  "3600": "1 hour",
+  "21600": "6 hours",
+  "86400": "24 hours",
+  "259200": "3 days",
+  "604800": "7 days",
 };
 
 export default RegionSidebar;
