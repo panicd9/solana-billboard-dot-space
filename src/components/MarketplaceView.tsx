@@ -6,6 +6,7 @@ import { useRegions } from "@/context/RegionContext";
 import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
 import RegionMiniMap from "@/components/RegionMiniMap";
 import { BoostDot } from "@/components/BoostDot";
+import { ListingStatus } from "@/components/ListingStatus";
 import { BOOST_META_LIST } from "@/lib/boosts";
 import { useNowSeconds } from "@/hooks/useNow";
 import {
@@ -223,9 +224,7 @@ const MarketplaceView = ({ onHighlightRegion }: Props) => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Status</span>
-                      <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
-                        {currentPrice ? `Listed @ ${currentPrice} SOL` : "Unlisted"}
-                      </span>
+                      <ListingStatus listing={r.listing} isListed={r.isListed} />
                     </div>
                   </div>
                 </button>

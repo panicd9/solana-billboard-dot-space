@@ -98,6 +98,28 @@ export function formatSol(lamports: bigint): string {
   return units.toFixed(3);
 }
 
+export type ListingMode = "fixed" | "falling" | "rising";
+
+export function getListingMode(startPrice: bigint, endPrice: bigint): ListingMode {
+  if (endPrice === startPrice) return "fixed";
+  return endPrice < startPrice ? "falling" : "rising";
+}
+
+export function formatListingTimeLeft(endTime: bigint): string {
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  if (endTime <= now) return "ended";
+  const remaining = Number(endTime - now);
+  const h = Math.floor(remaining / 3600);
+  const m = Math.floor((remaining % 3600) / 60);
+  if (h >= 24) {
+    const d = Math.floor(h / 24);
+    return `${d}d ${h % 24}h left`;
+  }
+  if (h > 0) return `${h}h ${m}m left`;
+  if (m > 0) return `${m}m left`;
+  return `${remaining}s left`;
+}
+
 export function calculateListingCurrentPrice(
   startPrice: bigint,
   endPrice: bigint,

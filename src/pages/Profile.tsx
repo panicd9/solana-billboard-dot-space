@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Copy, ExternalLink, Tag } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useWalletConnection } from "@solana/react-hooks";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import SiteFooter from "@/components/SiteFooter";
 import { BoostDot } from "@/components/BoostDot";
 import { useRegions } from "@/context/RegionContext";
 import { useNowSeconds } from "@/hooks/useNow";
-import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
+import { ListingStatus } from "@/components/ListingStatus";
 import { BOOST_META_LIST } from "@/lib/boosts";
 import logo from "@/assets/logo.png";
 import { isBoostActive, boostSecondsRemaining, formatBoostCountdown, effectiveOwner, type Region } from "@/types/region";
@@ -248,17 +248,6 @@ interface RegionCardProps {
 }
 
 const RegionCard = ({ region: r, onOpen, nowSec, hidden }: RegionCardProps) => {
-  const currentPrice =
-    r.isListed && r.listing
-      ? formatSol(
-          calculateListingCurrentPrice(
-            r.listing.startPrice,
-            r.listing.endPrice,
-            r.listing.startTime,
-            r.listing.endTime
-          )
-        )
-      : null;
   const totalBlocks = r.width * r.height;
 
   const activeBoosts = BOOST_META_LIST.filter((m) => isBoostActive(m.getAt(r), nowSec));
@@ -310,15 +299,7 @@ const RegionCard = ({ region: r, onOpen, nowSec, hidden }: RegionCardProps) => {
         </div>
         <div className="flex justify-between pt-1 border-t border-border">
           <span className="text-muted-foreground">Status</span>
-          <span className={r.isListed ? "text-accent inline-flex items-center gap-1" : "text-muted-foreground"}>
-            {currentPrice ? (
-              <>
-                <Tag className="w-3 h-3" /> {currentPrice} SOL
-              </>
-            ) : (
-              "Unlisted"
-            )}
-          </span>
+          <ListingStatus listing={r.listing} isListed={r.isListed} />
         </div>
       </div>
     </button>

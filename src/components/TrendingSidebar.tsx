@@ -1,6 +1,6 @@
 import { useRegions } from "@/context/RegionContext";
 import { TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
-import { calculateListingCurrentPrice, formatSol } from "@/solana/pricing";
+import { ListingStatus } from "@/components/ListingStatus";
 import {
   boostSecondsRemaining,
   formatBoostCountdown,
@@ -79,17 +79,11 @@ const TrendingSidebar = ({ onSelectRegion, collapsed, onToggleCollapse }: Props)
                     {r.width}x{r.height} · ({r.startX},{r.startY})
                   </p>
                   {r.isListed && r.listing && (
-                    <p className="text-xs text-accent font-semibold">
-                      {formatSol(
-                        calculateListingCurrentPrice(
-                          r.listing.startPrice,
-                          r.listing.endPrice,
-                          r.listing.startTime,
-                          r.listing.endTime
-                        )
-                      )}{" "}
-                      SOL
-                    </p>
+                    <ListingStatus
+                      listing={r.listing}
+                      isListed={r.isListed}
+                      className="text-xs font-semibold"
+                    />
                   )}
                   <p className={`text-[10px] font-mono ${BOOST_META.trending.iconClass}`}>
                     {formatBoostCountdown(boostSecondsRemaining(r.trendingAt, nowSec))}

@@ -49,9 +49,12 @@ import {
 } from "@/hooks/useAffordability";
 import {
   calculateListingCurrentPrice,
+  formatListingTimeLeft,
   formatSol,
+  getListingMode,
   parseSolInputToLamports,
 } from "@/solana/pricing";
+import { ListingStatus } from "@/components/ListingStatus";
 import { sanitizeExternalUrl } from "@/lib/urls";
 import { generateShareImage } from "@/lib/shareImage";
 import { uploadToIpfs } from "@/solana/ipfs";
@@ -460,13 +463,20 @@ const RegionSidebar = () => {
           <span className="text-muted-foreground">Blocks</span>
           <span className="text-foreground">{totalBlocks}</span>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between items-start gap-2">
           <span className="text-muted-foreground">Status</span>
-          <span className={r.isListed ? "text-accent" : "text-muted-foreground"}>
-            {currentListingPrice !== null
-              ? `Listed @ ${formatSol(currentListingPrice)} SOL`
-              : "Not listed"}
-          </span>
+          <div className="text-right">
+            <ListingStatus
+              listing={r.listing}
+              isListed={r.isListed}
+              unlistedLabel="Not listed"
+            />
+            {r.isListed && r.listing && getListingMode(r.listing.startPrice, r.listing.endPrice) !== "fixed" && (
+              <div className="text-[10px] text-muted-foreground mt-0.5">
+                {formatSol(r.listing.startPrice)} → {formatSol(r.listing.endPrice)} · {formatListingTimeLeft(r.listing.endTime)}
+              </div>
+            )}
+          </div>
         </div>
         {r.linkUrl && (() => {
           const safeLink = sanitizeExternalUrl(r.linkUrl);
