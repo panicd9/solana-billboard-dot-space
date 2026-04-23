@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react";
-import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, isBoostActive, type Selection, type Region } from "@/types/region";
+import { GRID_COLS, GRID_ROWS, BLOCK_SIZE, CANVAS_W, CANVAS_H, isBoostActive, effectiveOwner, type Selection, type Region } from "@/types/region";
 import { CENTER_ZONE_X, CENTER_ZONE_Y, CENTER_ZONE_WIDTH, CENTER_ZONE_HEIGHT } from "@/solana/constants";
 import { useRegions } from "@/context/RegionContext";
 import { ZoomIn, ZoomOut, Maximize, MousePointer2, Coins, X, Loader2 } from "lucide-react";
@@ -16,6 +16,7 @@ interface Props {
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
+const PAN_HINT_KEY = "solana_billboard_pan_hint_dismissed";
 
 // Center-cropped source rect that preserves aspect ratio ("object-fit: cover").
 function coverSourceRect(
@@ -58,7 +59,7 @@ function containDestRect(
 const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPricingOverlay, heroDismissed, onDismissHero, previewImage }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isAssetHidden, imageFit, isLoading } = useRegions();
+  const { regions, occupancy, isOccupied, hasOverlap, getRegionAt, loadedImages, animatedImages, isAssetHidden, imageFit, isLoading, pendingLocate, clearPendingLocate } = useRegions();
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ col: number; row: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<{ col: number; row: number } | null>(null);
@@ -76,6 +77,42 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const [panHintDismissed, setPanHintDismissed] = useState(() => {
+    try { return localStorage.getItem(PAN_HINT_KEY) === "1"; } catch { return false; }
+  });
+  const dismissPanHint = useCallback(() => {
+    setPanHintDismissed(true);
+    try { localStorage.setItem(PAN_HINT_KEY, "1"); } catch { /* ignore */ }
+  }, []);
+
+  // Locate/wayfind animation — triggered by selections from outside the canvas
+  // (trending sidebar, marketplace, deep-link). Pans to center the region then
+  // pulses a teal ring so the user can see where on the grid the selection is.
+  const locateAnimRef = useRef<{
+    region: Region;
+    startedAt: number;
+    panDuration: number;
+    ringDuration: number;
+  } | null>(null);
+  const locateRafRef = useRef<number>(0);
+  const [locateTick, setLocateTick] = useState(0);
+
+  const cancelLocate = useCallback(() => {
+    if (locateAnimRef.current) {
+      locateAnimRef.current = null;
+      if (locateRafRef.current) {
+        cancelAnimationFrame(locateRafRef.current);
+        locateRafRef.current = 0;
+      }
+      setLocateTick((v) => v + 1);
+    }
+  }, []);
+
+  // Cancel locate on unmount (belt-and-suspenders — the rAF loop also stops
+  // once locateAnimRef becomes null).
+  useEffect(() => () => {
+    if (locateRafRef.current) cancelAnimationFrame(locateRafRef.current);
+  }, []);
 
   // Keyboard navigation state
   const [kbCursor, setKbCursor] = useState<{ col: number; row: number } | null>(null);
@@ -133,9 +170,11 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      cancelLocate();
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
         e.preventDefault();
         setIsPanning(true);
+        dismissPanHint();
         panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
         return;
       }
@@ -170,7 +209,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
       setDragEnd(coords);
       onSelectionChange(null);
     },
-    [getBlockCoords, getRegionAt, onRegionClick, onSelectionChange, pan, selection]
+    [getBlockCoords, getRegionAt, onRegionClick, onSelectionChange, pan, selection, cancelLocate, dismissPanHint]
   );
 
   const handleMouseMove = useCallback(
@@ -205,12 +244,13 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
 
       const region = getRegionAt(coords.col, coords.row);
       if (region && !isDragging) {
-        const canvas = canvasRef.current!;
-        const rect = canvas.getBoundingClientRect();
+        const container = containerRef.current!;
+        const rect = container.getBoundingClientRect();
+        const o = effectiveOwner(region);
         setTooltipInfo({
           x: e.clientX - rect.left,
           y: e.clientY - rect.top,
-          text: `${region.owner.slice(0, 4)}...${region.owner.slice(-4)} | ${region.width}x${region.height}`,
+          text: `${o.slice(0, 4)}...${o.slice(-4)} | ${region.width}x${region.height}`,
         });
       } else {
         setTooltipInfo(null);
@@ -265,6 +305,24 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     if (!canvas) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      cancelLocate();
+
+      // Touchpad two-finger drag: has deltaX, or small pixel-precise deltaY
+      // with no ctrlKey. Pinch-to-zoom surfaces as ctrlKey=true on all
+      // browsers. Mouse wheels emit larger integer deltaY with no deltaX.
+      const isPinch = e.ctrlKey;
+      const isTouchpadPan =
+        !isPinch &&
+        (e.deltaX !== 0 ||
+          (e.deltaMode === 0 && Math.abs(e.deltaY) < 50));
+
+      if (isTouchpadPan) {
+        if (e.deltaX === 0 && e.deltaY === 0) return;
+        dismissPanHint();
+        setPan(clampPan(pan.x - e.deltaX, pan.y - e.deltaY, zoom));
+        return;
+      }
+
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -280,7 +338,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     };
     canvas.addEventListener("wheel", handler, { passive: false });
     return () => canvas.removeEventListener("wheel", handler);
-  }, [zoom, pan, clampPan]);
+  }, [zoom, pan, clampPan, cancelLocate, dismissPanHint]);
 
   const resetView = useCallback(() => {
     setZoom(1);
@@ -294,6 +352,76 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
   const zoomOut = useCallback(() => {
     setZoom(z => Math.max(MIN_ZOOM, z * 0.7));
   }, []);
+
+  // Kick off pan+ring animation when a `pendingLocate` arrives. Consumes
+  // the pending locate immediately so it doesn't replay on remount. We
+  // deliberately don't return a cleanup fn: clearPendingLocate triggers
+  // a re-render with `pendingLocate=null`, which would cancel the rAF
+  // we just scheduled. rAF lifetime is tracked in locateRafRef instead.
+  useEffect(() => {
+    if (!pendingLocate) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Supersede any in-flight locate animation.
+    if (locateRafRef.current) {
+      cancelAnimationFrame(locateRafRef.current);
+      locateRafRef.current = 0;
+    }
+
+    const { region } = pendingLocate;
+    const rcx = (region.startX + region.width / 2) * BLOCK_SIZE;
+    const rcy = (region.startY + region.height / 2) * BLOCK_SIZE;
+    const targetPanX = canvas.width / 2 - rcx * zoom;
+    const targetPanY = canvas.height / 2 - rcy * zoom;
+    const clampedTarget = clampPan(targetPanX, targetPanY, zoom);
+
+    const startPan = { x: pan.x, y: pan.y };
+    const startedAt = performance.now();
+    const PAN_DURATION = reducedMotion ? 0 : 300;
+    const RING_DURATION = 1800;
+
+    locateAnimRef.current = {
+      region,
+      startedAt,
+      panDuration: PAN_DURATION,
+      ringDuration: RING_DURATION,
+    };
+
+    clearPendingLocate();
+
+    const tick = () => {
+      const anim = locateAnimRef.current;
+      if (!anim) {
+        locateRafRef.current = 0;
+        return;
+      }
+      const elapsed = performance.now() - anim.startedAt;
+
+      if (elapsed < PAN_DURATION) {
+        const t = Math.min(1, elapsed / PAN_DURATION);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setPan({
+          x: startPan.x + (clampedTarget.x - startPan.x) * eased,
+          y: startPan.y + (clampedTarget.y - startPan.y) * eased,
+        });
+        locateRafRef.current = requestAnimationFrame(tick);
+      } else if (elapsed < PAN_DURATION + RING_DURATION) {
+        setLocateTick((v) => v + 1);
+        locateRafRef.current = requestAnimationFrame(tick);
+      } else {
+        locateAnimRef.current = null;
+        locateRafRef.current = 0;
+        setLocateTick((v) => v + 1);
+      }
+    };
+
+    if (PAN_DURATION === 0) {
+      setPan(clampedTarget);
+    }
+    locateRafRef.current = requestAnimationFrame(tick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingLocate]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback(
@@ -564,7 +692,8 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
           }
           ctx.restore();
 
-          const label = `${region.owner.slice(0, 4)}..${region.owner.slice(-4)}`;
+          const eo = effectiveOwner(region);
+          const label = `${eo.slice(0, 4)}..${eo.slice(-4)}`;
           const fontSize = Math.min(20, Math.min(rw, rh) * 0.6);
           if (fontSize >= 4) {
             ctx.font = `${fontSize / zoom}px 'JetBrains Mono', monospace`;
@@ -717,6 +846,45 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
         }
       }
 
+      // Wayfinding ring — pulses around a region that was just located from
+      // outside the canvas (trending sidebar, marketplace, deep link).
+      const locate = locateAnimRef.current;
+      if (locate) {
+        const elapsed = performance.now() - locate.startedAt;
+        if (elapsed >= locate.panDuration) {
+          const ringElapsed = elapsed - locate.panDuration;
+          const progress = Math.min(1, ringElapsed / locate.ringDuration);
+
+          let alpha: number;
+          if (reducedMotion) {
+            // Steady ring that fades out in the last 20% of the duration.
+            alpha = progress < 0.8 ? 1 : 1 - (progress - 0.8) / 0.2;
+          } else {
+            // Two pulses with a tail fade so the ring doesn't pop away.
+            const pulse = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(progress * Math.PI * 4));
+            const fadeOut = progress < 0.82 ? 1 : 1 - (progress - 0.82) / 0.18;
+            alpha = pulse * fadeOut;
+          }
+
+          const lr = locate.region;
+          const rx = lr.startX * BLOCK_SIZE;
+          const ry = lr.startY * BLOCK_SIZE;
+          const rw = lr.width * BLOCK_SIZE;
+          const rh = lr.height * BLOCK_SIZE;
+          const outset = 6 / zoom;
+
+          ctx.save();
+          ctx.fillStyle = `rgba(0, 210, 190, ${alpha * 0.08})`;
+          ctx.fillRect(rx, ry, rw, rh);
+          ctx.shadowColor = `rgba(0, 210, 190, ${alpha * 0.85})`;
+          ctx.shadowBlur = 14 / zoom;
+          ctx.strokeStyle = `rgba(0, 210, 190, ${alpha})`;
+          ctx.lineWidth = 3 / zoom;
+          ctx.strokeRect(rx - outset, ry - outset, rw + outset * 2, rh + outset * 2);
+          ctx.restore();
+        }
+      }
+
       // Hover highlight (mouse)
       if (hoveredBlock && !isDragging && !isOccupied(hoveredBlock.col, hoveredBlock.row)) {
         ctx.fillStyle = "rgba(0, 224, 255, 0.15)";
@@ -825,7 +993,7 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
     regions, occupancy, loadedImages, animatedImages, isAssetHidden, hoveredBlock, isDragging, dragStart, dragEnd,
     selection, normalizeSelection, hasOverlap, isOccupied, getRegionAt, zoom, pan,
     showPricingOverlay, kbCursor, kbAnchor, hasAnimatedBoost, hasAnimatedGif, reducedMotion,
-    previewImage, imageFit, moveState,
+    previewImage, imageFit, moveState, locateTick,
   ]);
 
   const cursorLabel = kbCursor
@@ -923,6 +1091,17 @@ const PixelCanvas = memo(({ selection, onSelectionChange, onRegionClick, showPri
               From 0.00004 SOL per block
             </div>
           </div>
+        </div>
+      )}
+
+      {zoom > 1 && !panHintDismissed && (
+        <div
+          className="absolute bottom-14 right-4 px-2.5 py-1.5 rounded-md bg-card/90 border border-border backdrop-blur-sm text-xs text-muted-foreground flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-1 duration-300 pointer-events-none"
+          aria-hidden="true"
+        >
+          <span>Two-finger drag, or</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-foreground font-mono text-[10px] leading-none">Alt</kbd>
+          <span>+ drag to pan</span>
         </div>
       )}
 
