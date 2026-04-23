@@ -59,7 +59,7 @@ All region state is read from on-chain accounts via TanStack Query and exposed t
 | Path | Page |
 |------|------|
 | `/` | [Index](src/pages/Index.tsx) — canvas + marketplace toggle (the main app) |
-| `/preview` | [Preview](src/pages/Preview.tsx) — OG preview image |
+| `/preview` | [Preview](src/pages/Preview.tsx) — dev-only mock canvas (gated by `import.meta.env.DEV`; not registered in prod builds) |
 | `/preview-card` | [PreviewCard](src/pages/PreviewCard.tsx) — OG preview card |
 | `/u/:wallet` | [Profile](src/pages/Profile.tsx) — public owner profile |
 | `/embed/r/:assetId` | [Embed](src/pages/Embed.tsx) — iframe widget for a single region |

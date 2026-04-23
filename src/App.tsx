@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,13 +8,14 @@ import { Analytics } from "@vercel/analytics/react";
 import SolanaProvider from "@/components/SolanaProvider";
 import { RegionProvider } from "@/context/RegionContext";
 import Index from "./pages/Index";
-import Preview from "./pages/Preview";
 import PreviewCard from "./pages/PreviewCard";
 import Profile from "./pages/Profile";
 import Embed from "./pages/Embed";
 import Activity from "./pages/Activity";
 import Policy from "./pages/Policy";
 import NotFound from "./pages/NotFound";
+
+const Preview = import.meta.env.DEV ? lazy(() => import("./pages/Preview")) : null;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,7 +37,16 @@ const App = () => (
           <RegionProvider>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/preview" element={<Preview />} />
+              {Preview && (
+                <Route
+                  path="/preview"
+                  element={
+                    <Suspense fallback={null}>
+                      <Preview />
+                    </Suspense>
+                  }
+                />
+              )}
               <Route path="/preview-card" element={<PreviewCard />} />
               <Route path="/u/:wallet" element={<Profile />} />
               <Route path="/embed/r/:assetId" element={<Embed />} />
